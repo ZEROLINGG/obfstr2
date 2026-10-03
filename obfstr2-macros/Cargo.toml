@@ -1,6 +1,6 @@
 [package]
 name = "obfstr2-macros"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 resolver = "2"
 description = "obfstr2 的过程宏实现：字符串/字节/文件编译期混淆入口"

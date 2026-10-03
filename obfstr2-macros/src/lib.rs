@@ -3,6 +3,7 @@
 //! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!` 九个宏（低延迟 / 均衡 / 高强度三档）；
 //! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use obfstr2_macros::*`）。
 mod bytes;
+mod combine;
 mod str;
 
 use proc_macro::TokenStream;
@@ -217,6 +218,23 @@ pub fn f3(input: TokenStream) -> TokenStream {
     expand_file(input, crate::bytes::b3)
 }
 
+/// 格式化字符串混淆宏（2 档，对应 `s2`）。
+///
+/// 首参须为字符串字面量：其中的字面量片段逐个混淆后注入 `format!` 调用，
+/// 占位符与后续参数原样保留。返回 `String`，需要调用方有 `std` / `alloc`。
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s2：不可 doctest，覆盖见 `tests::test_s_fmt_macro`。
+/// use obfstr2::s_fmt;
+/// let s = s_fmt!("hello {}", name);
+/// ```
+#[proc_macro]
+pub fn s_fmt(input: TokenStream) -> TokenStream {
+    crate::combine::sfmt(input.into()).into()
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -284,6 +302,58 @@ mod tests {
             ret.stderr
         );
     }
+    #[test]
+    fn test_s_fmt_macro() {
+        run_case(
+            r#"fn main() { let name = "world"; print!("{}", obfstr2::s_fmt!("hello {}", name)) }"#,
+            "hello world",
+            "s_fmt",
+        );
+    }
+
+    #[test]
+    fn test_s_fmt_escaped_braces() {
+        run_case(
+            r#"fn main() { let v = 42; print!("{}", obfstr2::s_fmt!("{{hi}} {}-{v:?}", v)) }"#,
+            "{hi} 42-42",
+            "s_fmt-escaped",
+        );
+    }
+
+    #[test]
+    fn test_s_fmt_rejects_non_literal() {
+        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
+        let ret = dny_run(
+            r#"fn main() { let f = "x"; print!("{}", obfstr2::s_fmt!(f)) }"#,
+            deps,
+            None,
+            false,
+        );
+        assert!(!ret.ok, "非字面量首参应当编译失败");
+        assert!(
+            ret.stderr.contains("必须是字符串字面量"),
+            "错误信息应提示字面量要求，实际 stderr:\n{}",
+            ret.stderr
+        );
+    }
+
+    #[test]
+    fn test_s_fmt_rejects_unclosed_brace() {
+        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
+        let ret = dny_run(
+            r#"fn main() { print!("{}", obfstr2::s_fmt!("a{b")) }"#,
+            deps,
+            None,
+            false,
+        );
+        assert!(!ret.ok, "未闭合括号应当编译失败");
+        assert!(
+            ret.stderr.contains("未闭合"),
+            "错误信息应提示未闭合，实际 stderr:\n{}",
+            ret.stderr
+        );
+    }
+
     #[test]
     fn test_b_array_rejects_out_of_range() {
         let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;

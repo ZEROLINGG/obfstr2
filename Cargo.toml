@@ -1,6 +1,6 @@
 [package]
 name = "obfstr2"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 resolver = "2"
 description = "高度多态化的编译期字符串/字节/文件混淆库（no_std 兼容）"

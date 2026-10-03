@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 8f42b1159ea2e26b (source: README.md) -->
+<!-- i18n-sync-anchor: 6acdae4232672217 (source: README.md) -->
 
 > **Highly polymorphic compile-time string/bytes/file obfuscation library (`no_std` compatible)**
 
@@ -87,6 +87,7 @@ fn main() {
 | `s1!` / `s2!` / `s3!` | `"..."` string literals | Low-latency / Balanced / High-strength |
 | `b1!` / `b2!` / `b3!` | `b"..."` or `[0x41, 66, ...]` (elements must be 0..=255) | Low-latency / Balanced / High-strength |
 | `f1!` / `f2!` / `f3!` | `"path/to/file"` file path literals | Low-latency / Balanced / High-strength |
+| `s_fmt!` | `"...{}..."` format string + args (tier 2) | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
 
 Notes:
 
