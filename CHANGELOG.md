@@ -27,12 +27,12 @@
 
 ### 新增 (Added)
 
-- 首个版本：`obfstr2` 根 crate（转发 `crypto` / `types` / 全部混淆宏）与 `macros-obfstr` 过程宏 crate
+- 首个版本：`obfstr2` 根 crate（转发 `crypto` / `types` / 全部混淆宏）与 `obfstr2-macros` 过程宏 crate
 - 字符串宏 `s1!` / `s2!` / `s3!`（低延迟 / 均衡 / 高强度三档，输入 `"..."`）
 - 字节宏 `b1!` / `b2!` / `b3!`（输入 `b"..."` 或 `[0x41, 66, ...]` 数组，元素须为 0..=255 整数字面量）
 - 文件宏 `f1!` / `f2!` / `f3!`（输入路径字面量，相对被编译 crate 的 `CARGO_MANIFEST_DIR` 编译期读入）
 - 非法输入（越界数组元素、缺失文件）经 `compile_error!` 定位到调用点
-- `README.md`（简体中文）与 `macros-obfstr/README.md` 指向说明
+- `README.md`（简体中文）与 `obfstr2-macros/README.md` 指向说明
 - 端到端 dyntest 用例：宏展开→编译→运行→断言还原（含 `no_std` 裸机链路）
 
 ### 变更 (Changed)

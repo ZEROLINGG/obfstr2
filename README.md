@@ -107,7 +107,7 @@ fn main() {
 
 | Feature | 默认启用 | 说明 |
 | :--- | :--- | :--- |
-| `default` | ✅ | `lib-unknown/alloc` + `macros-obfstr/alloc`，开启 `Heap*` 堆内存类型 |
+| `default` | ✅ | `lib-unknown/alloc` + `obfstr2-macros/alloc`，开启 `Heap*` 堆内存类型 |
 | `alloc`（各 crate 独立） | ❌ | 关闭时仅 `Stack*` 可用（纯栈、无堆，`no_std` 裸机可用） |
 
 ## 最小 Rust 版本 (MSRV)
@@ -154,7 +154,7 @@ MSRV 未在 `Cargo.toml` 声明，在`rustc 1.98.1`测试稳定。
 
 欢迎提交 Issue 和 Pull Request！
 
-- 本地验证：`cargo test -p macros-obfstr --lib`（dyntest 会现场编译临时工程，完整套件约需数分钟）。
+- 本地验证：`cd obfstr2-macros && cargo test --lib`（dyntest 会现场编译临时工程，完整套件约需数分钟）。
 - 提交 PR 前请先阅读[设计哲学](#设计哲学-design-philosophy)：新增混淆原语请以 `Crypto` / `Storage` 表项形式接入，保持流程抽象层不动。
 
 ## 变更日志 (Changelog)

@@ -1,4 +1,4 @@
-# macros-obfstr
+# obfstr2-macros
 
 `obfstr2` 的过程宏实现 crate（`s1~3!`、`b1~3!`、`f1~3!`）。
 

@@ -10,12 +10,12 @@ repository = "https://github.com/ZEROLINGG/obfstr2"
 
 
 [dependencies]
-macros-obfstr = { path = "macros-obfstr" }
+obfstr2-macros = { version = "0.1", path = "obfstr2-macros" }
 lib-unknown = { version = "0.1", default-features = false, features = ["crypto", "types"] }
 
 
 [features]
 default = [
     "lib-unknown/alloc",
-    "macros-obfstr/alloc"
+    "obfstr2-macros/alloc"
 ]

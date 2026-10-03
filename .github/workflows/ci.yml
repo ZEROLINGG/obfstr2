@@ -27,33 +27,33 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: rustfmt (obfstr2 + macros-obfstr)
+      - name: rustfmt (obfstr2 + obfstr2-macros)
         run: |
           cargo fmt --all -- --check
-          cd macros-obfstr && cargo fmt --all -- --check
+          cd obfstr2-macros && cargo fmt --all -- --check
 
-      - name: clippy (obfstr2 + macros-obfstr)
+      - name: clippy (obfstr2 + obfstr2-macros)
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
-          cd macros-obfstr && cargo clippy --all-targets --all-features -- -D warnings \
+          cd obfstr2-macros && cargo clippy --all-targets --all-features -- -D warnings \
             -W clippy::missing_errors_doc \
             -W clippy::missing_panics_doc \
             -W clippy::undocumented_unsafe_blocks \
             -W clippy::unwrap_used \
             -W clippy::expect_used
 
-      - name: test (obfstr2 + macros-obfstr)
+      - name: test (obfstr2 + obfstr2-macros)
         run: |
           cargo test --all-features --all-targets
-          cd macros-obfstr && cargo test --all-features --all-targets
+          cd obfstr2-macros && cargo test --all-features --all-targets
 
-      - name: doctest (macros-obfstr)
+      - name: doctest (obfstr2-macros)
         run: |
-          cd macros-obfstr && cargo test --doc --all-features
+          cd obfstr2-macros && cargo test --doc --all-features
 
       - name: doc build (deny warnings)
         run: |
           cargo doc --no-deps --all-features
-          cd macros-obfstr && cargo doc --no-deps --all-features
+          cd obfstr2-macros && cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings

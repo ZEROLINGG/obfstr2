@@ -1,7 +1,7 @@
 //! `obfstr2` 的过程宏实现 crate：字符串 / 字节 / 文件编译期混淆入口。
 //!
 //! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!` 九个宏（低延迟 / 均衡 / 高强度三档）；
-//! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use macros_obfstr::*`）。
+//! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use obfstr2_macros::*`）。
 mod bytes;
 mod str;
 
