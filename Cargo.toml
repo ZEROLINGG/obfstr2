@@ -1,0 +1,17 @@
+[package]
+name = "obfstr2"
+version = "0.1.0"
+edition = "2024"
+resolver = "2"
+
+
+[dependencies]
+macros-obfstr = { path = "macros-obfstr" }
+lib-unknown = { version = "0.1", default-features = false, features = ["crypto", "types"] }
+
+
+[features]
+default = [
+    "lib-unknown/alloc",
+    "macros-obfstr/alloc"
+]

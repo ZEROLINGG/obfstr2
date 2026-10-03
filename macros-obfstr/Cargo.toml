@@ -1,0 +1,23 @@
+[package]
+name = "macros-obfstr"
+version = "0.1.0"
+edition = "2024"
+resolver = "2"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "3", features = ["full", "derive", "visit-mut"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+
+lib-unknown = { version = "0.1", default-features = false, features = ["rand", "rand-expand", "crypto", "dyntest", "std"]}
+
+[dev-dependencies]
+lib-unknown = { version = "0.1", features = ["dyntest", "std"] }
+
+[features]
+default = [
+]
+alloc = []
