@@ -1,3 +1,7 @@
+//! `obfstr2` 的过程宏实现 crate：字符串 / 字节 / 文件编译期混淆入口。
+//!
+//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!` 九个宏（低延迟 / 均衡 / 高强度三档）；
+//! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use macros_obfstr::*`）。
 mod bytes;
 mod str;
 
@@ -75,6 +79,14 @@ fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStrea
 ///
 /// 只接受字符串字面量 `"..."`，展开为求值即得原文的表达式（类型为
 /// `StackStr<N>`，请使用类型推断，不要写死类型标注）。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 过程宏无法在定义 crate 内 doctest（需外部调用方展开）；
+/// // 覆盖见 `tests::test_s2_macro` 的 dyntest 端到端用例（s1 同理）。
+/// use obfstr2::s1;
+/// let s = s1!("hello");
+/// ```
 #[proc_macro]
 pub fn s1(input: TokenStream) -> TokenStream {
     expand_str(input, crate::str::s1)
@@ -84,6 +96,13 @@ pub fn s1(input: TokenStream) -> TokenStream {
 ///
 /// 只接受字符串字面量 `"..."`。返回的具体字符串类型（`StackStr` /
 /// `HeapStr`）同一宏名下可能随编译变化，请使用类型推断。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_s2_macro`。
+/// use obfstr2::s2;
+/// let s = s2!("hello");
+/// ```
 #[proc_macro]
 pub fn s2(input: TokenStream) -> TokenStream {
     expand_str(input, crate::str::s2)
@@ -92,6 +111,13 @@ pub fn s2(input: TokenStream) -> TokenStream {
 /// 字符串混淆宏（高强度档，对应 `s3`）。
 ///
 /// 只接受字符串字面量 `"..."`，展开类型规则同 [`s2`](s2())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_s2_macro`（s3 同理）。
+/// use obfstr2::s3;
+/// let s = s3!("hello");
+/// ```
 #[proc_macro]
 pub fn s3(input: TokenStream) -> TokenStream {
     expand_str(input, crate::str::s3)
@@ -101,6 +127,13 @@ pub fn s3(input: TokenStream) -> TokenStream {
 ///
 /// 接受字节串字面量 `b"..."` 或字节数组 `[0x41, 66, ...]`（元素须为 0..=255 的整数字面量），展开为求值即得原文的字节容器表达式
 /// （`StackBytes<N>` / `HeapBytes<N>`，可解引用为 `[u8]`）。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_b2_macro`（b1 同理）。
+/// use obfstr2::b1;
+/// let b = b1!(b"abc");
+/// ```
 #[proc_macro]
 pub fn b1(input: TokenStream) -> TokenStream {
     expand_bytes(input, crate::bytes::b1)
@@ -109,6 +142,13 @@ pub fn b1(input: TokenStream) -> TokenStream {
 /// 字节串混淆宏（均衡档，对应 `b2`）。
 ///
 /// 接受 `b"..."` 或 `[0x41, 66, ...]`（元素须为 0..=255 的整数字面量）。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_b2_macro`。
+/// use obfstr2::b2;
+/// let b = b2!([0x61, 98, 99]);
+/// ```
 #[proc_macro]
 pub fn b2(input: TokenStream) -> TokenStream {
     expand_bytes(input, crate::bytes::b2)
@@ -117,6 +157,13 @@ pub fn b2(input: TokenStream) -> TokenStream {
 /// 字节串混淆宏（高强度档，对应 `b3`）。
 ///
 /// 接受 `b"..."` 或 `[0x41, 66, ...]`（元素须为 0..=255 的整数字面量）。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_b2_macro`（b3 同理）。
+/// use obfstr2::b3;
+/// let b = b3!(b"abc");
+/// ```
 #[proc_macro]
 pub fn b3(input: TokenStream) -> TokenStream {
     expand_bytes(input, crate::bytes::b3)
@@ -128,6 +175,13 @@ pub fn b3(input: TokenStream) -> TokenStream {
 /// `CARGO_MANIFEST_DIR` 解析），编译期读入文件内容并混淆，展开为求值即得
 /// 文件原文的字节容器表达式（`StackBytes<N>` / `HeapBytes<N>`）。
 /// 需自行保证文件存在；文件缺失或不可读时报编译错误。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`（f1 同理）。
+/// use obfstr2::f1;
+/// let b = f1!("assets/secret.bin");
+/// ```
 #[proc_macro]
 pub fn f1(input: TokenStream) -> TokenStream {
     expand_file(input, crate::bytes::b1)
@@ -136,6 +190,13 @@ pub fn f1(input: TokenStream) -> TokenStream {
 /// 文件混淆宏（均衡档，对应 `b2`）。
 ///
 /// 输入与展开规则同 [`f1`](f1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`。
+/// use obfstr2::f2;
+/// let b = f2!("assets/secret.bin");
+/// ```
 #[proc_macro]
 pub fn f2(input: TokenStream) -> TokenStream {
     expand_file(input, crate::bytes::b2)
@@ -144,13 +205,20 @@ pub fn f2(input: TokenStream) -> TokenStream {
 /// 文件混淆宏（高强度档，对应 `b3`）。
 ///
 /// 输入与展开规则同 [`f1`](f1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`（f3 同理）。
+/// use obfstr2::f3;
+/// let b = f3!("assets/secret.bin");
+/// ```
 #[proc_macro]
 pub fn f3(input: TokenStream) -> TokenStream {
     expand_file(input, crate::bytes::b3)
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use lib_unknown::dyntest::dny_run;
 

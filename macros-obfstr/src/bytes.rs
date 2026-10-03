@@ -513,8 +513,7 @@ fn build_obfuscated_bytes(
         let mut #ghost_state: u8 = 0_u8;
     });
 
-    let mut i = 1;
-    for mut chunk in chunks {
+    for (i, mut chunk) in (1..).zip(chunks) {
         let iv: u8 = random();
         let key: u64 = random();
 
@@ -717,7 +716,6 @@ fn build_obfuscated_bytes(
 
             ts.extend(junk_ast);
         }
-        i += 1;
     }
 
     quote! {
@@ -759,6 +757,7 @@ pub fn b3(input: Vec<u8>) -> TokenStream2 {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use lib_unknown::dyntest::{DnyRun, clear_dny_project, dny_run};
@@ -781,7 +780,7 @@ mod tests {
         );
 
         println!("[{tag}] size: {}\n{:.128}...", code.len(), code);
-        let deps = format!("obfstr2 = {{ path = \"../../../../../obfstr2\"}} ");
+        let deps = "obfstr2 = { path = \"../../../../../obfstr2\"} ".to_string();
         let ret = dny_run(code.as_str(), deps.as_str(), None, false);
         println!("{ret}");
 
@@ -962,7 +961,7 @@ fn main() -> usize {
         let deps = source;
         println!("[{tag}] Code size: {}\n{:.128}...", code.len(), code);
 
-        let mut runner = DnyRun::new(&*code, &*deps);
+        let mut runner = DnyRun::new(&code, deps);
         runner.release(true);
         runner.cargo_config(
             r#"

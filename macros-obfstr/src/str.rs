@@ -54,6 +54,7 @@ pub fn s3(input: String) -> TokenStream2 {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use lib_unknown::dyntest::dny_run;
@@ -67,7 +68,7 @@ mod tests {
         let code = format!("fn main() {{ let x = {}; print!(\"{{x}}\") }}", ts);
 
         println!("[{tag}] size: {}\n{:.128}...", code.len(), code);
-        let deps = format!("obfstr2 = {{ path = \"../../../../../obfstr2\"}} ");
+        let deps = "obfstr2 = { path = \"../../../../../obfstr2\"} ".to_string();
         let ret = dny_run(code.as_str(), deps.as_str(), None, false);
         println!("{ret}");
         // println!("{:?}",ret.stderr);
