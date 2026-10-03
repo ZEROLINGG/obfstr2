@@ -2,8 +2,15 @@
 
 > **高度多态化的编译期字符串/字节/文件混淆库（no_std 兼容）**
 
-[![MSRV](https://img.shields.io/badge/MSRV-1.98-blue.svg)](#最小-rust-版本-msrv)
+[![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
+[![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
+[![Documentation](https://docs.rs/obfstr2/badge.svg)](https://docs.rs/obfstr2)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#开源协议-license)
+
+[![CI](https://github.com/ZEROLINGG/obfstr2/actions/workflows/ci.yml/badge.svg)](https://github.com/ZEROLINGG/obfstr2/actions)
+[![MSRV](https://img.shields.io/badge/MSRV-1.98-blue.svg)](#最小-rust-版本-msrv)
+
+**语言：** [English](README_en.md) | 简体中文
 
 高度多态化的编译期字符串/字节/文件混淆库（no_std 兼容）。
 
