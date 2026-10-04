@@ -1,7 +1,7 @@
 # obfstr2
-<!-- i18n-sync-anchor: 6acdae4232672217 (source: README.md) -->
+<!-- i18n-sync-anchor: 5da45bb7926dd167671fef7747a675cc4176a1bb (source: README.md) -->
 
-> **Highly polymorphic compile-time string/bytes/file obfuscation library (`no_std` compatible)**
+> **Polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible)**
 
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
@@ -13,11 +13,11 @@
 
 **Languages:** [简体中文](README.md) | English
 
-A highly polymorphic compile-time string/bytes/file obfuscation library (`no_std` compatible).
+A polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible).
 
-Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a different trade-off: CasualX delivers out-of-the-box string hiding with minimal expansion size, while obfstr2 trades roughly 6× expansion size for polymorphic defense — random chunking, randomly stacked primitives, four alternative storage forms, and junk-code interference — so the same input produces different ciphertext on every compilation, and batch recovery scripts cannot reuse a fixed pattern. Another key difference is data lifetime: obfstr2's container types (provided by `lib-unknown`) are automatically volatile-zeroed on `Drop`, so decrypted plaintext is wiped as soon as it is used instead of lingering on the stack / heap. That is why obfstr2 exists: **higher reverse-engineering cost, more polymorphic obfuscation, and automatic erasure of sensitive data at the end of its lifetime**.
+Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a different trade-off: CasualX delivers out-of-the-box string hiding with minimal expansion size, while obfstr2 trades roughly 6× expansion size for polymorphic defense — random chunking, randomly stacked primitives, multiple alternative storage forms, and junk-code interference — so the same input produces different ciphertext on every compilation, and batch recovery scripts cannot reuse a fixed pattern. Another key difference is data lifetime: obfstr2's container types (provided by `lib-unknown`) are automatically volatile-zeroed on `Drop`, so decrypted plaintext is wiped as soon as it is used instead of lingering on the stack / heap. That is why obfstr2 exists: **higher reverse-engineering cost, more polymorphic obfuscation, and automatic erasure of sensitive data at the end of its lifetime**.
 
-- Same: literals in, expressions out; `no_std` compatible; everything done at compile time with no runtime dependencies.
+- Same: literals in, expressions out; `no_std` compatible; obfuscation done at compile time, with `lib-unknown` as the only runtime dependency.
 - Different: CasualX macros return a reference borrowing a temporary (`let x = obfstr!(...)` triggers E0716 and can only be used inline), while obfstr2 returns owned containers that can be bound, passed around, and reused; CasualX expands to a single fixed form, obfstr2 takes a different form on every compilation.
 
 Randomness and crypto primitives come from [`lib-unknown`](https://github.com/ZEROLINGG/lib-unknown).
@@ -42,9 +42,9 @@ Randomness and crypto primitives come from [`lib-unknown`](https://github.com/ZE
 
 ### Core Principles
 
-1. **Extreme polymorphism** — the same input compiles to a different ciphertext form every time: random chunking (incrementally randomized `2i..8i` splits), randomly stacked crypto primitives (`1–3 × magnification`, stopping once the combined security level is reached), four randomly chosen storage forms (byte string / `u8` array / `u64` array / `u128` array), plus junk code and `ghost_state` interference. Batch recovery scripts cannot rely on a fixed pattern.
+1. **Extreme polymorphism** — the same input compiles to a different ciphertext form every time: random chunking (incrementally randomized `2i..8i` splits), randomly stacked crypto primitives (`1–3 × magnification`, stopping once the combined security level is reached), multiple randomly chosen storage forms (byte strings, `u8` / `u64` / `u128` arrays, MAC / UUID / IPv6 steganographic disguises, etc.), plus junk code and `ghost_state` interference. Batch recovery scripts cannot rely on a fixed pattern.
 2. **Abstracted obfuscation pipeline** — all algorithms converge into two registries: `Crypto { enc / dec / support / security / latency }` (polymorphic encryption/decryption) and `Storage { ast / support / security / latency }` (polymorphic ciphertext storage); `build_obfuscated_bytes` only orchestrates chunk → encrypt → store → emit. New algorithms just add table entries without touching the pipeline.
-3. **Compile-time evaluation, zero runtime dependencies** — proc macros expand to a closed token stream; at runtime only the `types` containers are needed; `no_std` compatible; invariants already verified at expansion time use `unwrap_unchecked` with no runtime checking overhead.
+3. **Compile-time evaluation, minimal runtime dependencies** — proc macros expand to a closed token stream; obfuscation is done at compile time, and at runtime only `lib-unknown`'s `types` and `crypto` are needed; `no_std` compatible; invariants already verified at expansion time use `unwrap_unchecked` with no runtime checking overhead.
 
 ### Trade-offs
 
@@ -164,7 +164,7 @@ If you find a security vulnerability, please file an Issue directly (this repo h
 Issues and Pull Requests are welcome!
 
 - Local verification: `cd obfstr2-macros && cargo test --lib` (dyntest compiles scratch projects on the fly; the full suite takes several minutes).
-- Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries and leave the pipeline abstraction untouched.
+- Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries (in `obfstr2-macros/src/crypto.rs` and `storage.rs` respectively) and leave the orchestration layer (`core.rs::build_obfuscated_bytes`) untouched.
 
 ## Changelog
 

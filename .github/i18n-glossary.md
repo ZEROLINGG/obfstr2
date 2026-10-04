@@ -11,7 +11,7 @@
 | 原语 | primitive | 指 Crypto 原语 |
 | 密文 | ciphertext | |
 | 明文 | plaintext | |
-| 存储形态 | storage form | 指字节串/u8/u64/u128 四种存储 |
+| 存储形态 | storage form | 多种存储形态，文档中举例后加“等”兜底，不写死具体数量 |
 | 垃圾代码 | junk code | |
 | 随机分块 | random chunking | |
 | 编译期 | compile-time | 作定语时加连字符 |

@@ -1,6 +1,6 @@
 # obfstr2
 
-> **高度多态化的编译期字符串/字节/文件混淆库（no_std 兼容）**
+> **Polymorphic compile-time string/bytes/file obfuscation**
 
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
@@ -12,11 +12,11 @@
 
 **语言：** [English](README_en.md) | 简体中文
 
-高度多态化的编译期字符串/字节/文件混淆库（no_std 兼容）。
+Polymorphic compile-time string/bytes/file obfuscation（no_std 兼容）。
 
 与 [CasualX/obfstr](https://github.com/CasualX/obfstr) 同类但路线不同：CasualX 以极小的展开体积实现开箱即用的字符串隐藏；obfstr2 则以约 6 倍的展开体积换取多形态防御——随机分块、原语随机叠加、多存储形态、垃圾代码干扰，使同一输入每次编译产出不同密文，批量还原脚本无法复用固定模式。另一关键差异是数据生命周期：obfstr2 的容器类型（`lib-unknown` 提供）在 `Drop` 时自动 volatile 清零，解密出的明文用完即擦，不会残留在栈 / 堆上。这就是为什么要有 obfstr2：**更高的逆向成本、更多态的混淆、敏感数据生命周期结束自动擦除**。
 
-- 同：字面量进、表达式出；`no_std` 可用；编译期完成、无运行时依赖。
+- 同：字面量进、表达式出；`no_std` 可用；混淆在编译期完成、运行时仅依赖 `lib-unknown`。
 - 异：CasualX 宏返回借用临时值的引用（`let x = obfstr!(...)` 会触发 E0716，只能内联使用），obfstr2 返回自有容器，可绑定、传递、复用；CasualX 单形态展开，obfstr2 每次编译形态皆不同。
 
 底层随机数与密码原语来自 [`lib-unknown`](https://github.com/ZEROLINGG/lib-unknown)。
@@ -41,9 +41,9 @@
 
 ### 核心原则
 
-1. **极度多态化** —— 同一份输入每次编译产出不同的密文形态：随机分块（`2i..8i` 递增随机切分）、加解密原语随机叠加（`1~3 × magnification` 个，组合安全度达标即停）、存储形态随机四选一（字节串 / `u8` 数组 / `u64` 数组 / `u128` 数组）、垃圾代码与 `ghost_state` 干扰。批量还原脚本无法依赖固定模式。
+1. **极度多态化** —— 同一份输入每次编译产出不同的密文形态：随机分块（`2i..8i` 递增随机切分）、加解密原语随机叠加（`1~3 × magnification` 个，组合安全度达标即停）、多种随机存储形态（字节串 / `u8` 数组 / `u64` 数组 / `u128` 数组 / MAC / UUID / IPv6 隐写等）、垃圾代码与 `ghost_state` 干扰。批量还原脚本无法依赖固定模式。
 2. **混淆流程抽象化** —— 全部算法收敛为两张注册表：`Crypto { enc / dec / support / security / latency }`（多态加解密）与 `Storage { ast / support / security / latency }`（多态密文存储），`build_obfuscated_bytes` 只负责分块→加密→存储→发射的编排。新增算法只需追加表项，无需改动流程。
-3. **编译期求值、零运行时依赖** —— 过程宏展开为封闭 Token 流，运行时仅依赖 `types` 容器；`no_std` 可用；展开期已验证的不变量用 `unwrap_unchecked`，不留运行时校验开销。
+3. **编译期求值、最小运行时依赖** —— 过程宏展开为封闭 Token 流，混淆在编译期完成，运行时仅依赖 `lib-unknown` 的 `types` 与 `crypto`；`no_std` 可用；展开期已验证的不变量用 `unwrap_unchecked`，不留运行时校验开销。
 
 ### 权衡取舍 (Trade-offs)
 
@@ -155,7 +155,6 @@ MSRV 未在 `Cargo.toml` 声明，在`rustc 1.98.1`测试稳定。
 
 ## 安全性 (Security)
 
-
 如发现安全漏洞，请直接提交 Issue 说明（本仓库暂无私有上报通道）。
 
 ## 贡献 (Contributing)
@@ -163,7 +162,7 @@ MSRV 未在 `Cargo.toml` 声明，在`rustc 1.98.1`测试稳定。
 欢迎提交 Issue 和 Pull Request！
 
 - 本地验证：`cd obfstr2-macros && cargo test --lib`（dyntest 会现场编译临时工程，完整套件约需数分钟）。
-- 提交 PR 前请先阅读[设计哲学](#设计哲学-design-philosophy)：新增混淆原语请以 `Crypto` / `Storage` 表项形式接入，保持流程抽象层不动。
+- 提交 PR 前请先阅读[设计哲学](#设计哲学-design-philosophy)：新增混淆原语请以 `Crypto` / `Storage` 表项形式接入（分别位于 `obfstr2-macros/src/crypto.rs` 与 `storage.rs`），编排层（`core.rs::build_obfuscated_bytes`）保持不动。
 
 ## 变更日志 (Changelog)
 
