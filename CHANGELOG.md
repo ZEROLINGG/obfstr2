@@ -23,6 +23,22 @@
 
 ---
 
+## [0.1.3] - 2026-10-04
+
+### 新增 (Added)
+
+- crates.io 关键词与分类：`obfstr2` 新增 `keywords`（obfuscation / string / no-std / compile-time / polymorphic）与 `categories`（no-std / embedded）；`obfstr2-macros` 新增 `keywords`（obfuscation / proc-macro / string / no-std / compile-time）与 `categories`（no-std / development-tools）
+
+### 变更 (Changed)
+
+- 快速开始示例扩写（中英同步）：`s2!` 改为绑定演示可传递复用，`b2!` 加字节串/数组等价断言，新增 `s_fmt!` 示例；示例经临时工程实测可编译运行
+- `src/lib.rs` 改为 `#![doc = include_str!("../README.md")]`，README 快速开始成为 doctest 在 CI 中真实执行；新增 `assets/secret.bin` 作为 `f2!` 示例的编译期 fixture；`[MIT License](LICENSE)` 改为 `./LICENSE` 以通过 rustdoc 链接检查（中英同步）
+
+### 修复 (Fixed)
+-
+
+---
+
 ## [0.1.2] - 2026-10-04
 
 ### 新增 (Added)

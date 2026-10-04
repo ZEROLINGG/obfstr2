@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 5da45bb7926dd167671fef7747a675cc4176a1bb (source: README.md) -->
+<!-- i18n-sync-anchor: 365d09b1baabab30bab905be0f58acac931c28de (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible)**
 
@@ -67,16 +67,25 @@ obfstr2 = "0.1"
 ```
 
 ```rust
-use obfstr2::{s2, b2, f2};
+use obfstr2::{b2, f2, s2, s_fmt};
 
 fn main() {
-    // Strings: evaluate to the original at runtime
-    print!("{}", s2!("hello"));
-    // Byte strings / byte arrays
+    // Strings: evaluate to the original at runtime; owned containers that
+    // can be bound, passed around, and reused
+    let hello = s2!("hello");
+    print!("{hello}");
+    // Byte strings / byte arrays: dereference to the original `[u8]`
     let b = b2!(b"abc");
     let c = b2!([0x61, 98, 99]);
-    // Files: path relative to the compiled crate's CARGO_MANIFEST_DIR
+    assert_eq!(&*b, &*c);
+    // Files: path relative to the compiled crate's CARGO_MANIFEST_DIR,
+    // read in at compile time
     let d = f2!("assets/secret.bin");
+    // Format strings: literal chunks are obfuscated one by one, then go
+    // through `format!`; placeholders work as usual, returns `String`
+    let name = "world";
+    let greeting = s_fmt!("hello, {}!", name);
+    print!("{greeting}");
 }
 ```
 
@@ -172,4 +181,4 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## License
 
-[MIT License](LICENSE)
+[MIT License](./LICENSE)

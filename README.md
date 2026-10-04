@@ -66,16 +66,22 @@ obfstr2 = "0.1"
 ```
 
 ```rust
-use obfstr2::{s2, b2, f2};
+use obfstr2::{b2, f2, s2, s_fmt};
 
 fn main() {
-    // 字符串：运行时求值即得原文
-    print!("{}", s2!("hello"));
-    // 字节串 / 字节数组
+    // 字符串：求值即得原文，返回自有容器，可绑定、传递、复用
+    let hello = s2!("hello");
+    print!("{hello}");
+    // 字节串 / 字节数组：解引用即得原文 `[u8]`
     let b = b2!(b"abc");
     let c = b2!([0x61, 98, 99]);
-    // 文件：路径相对被编译 crate 的 CARGO_MANIFEST_DIR
+    assert_eq!(&*b, &*c);
+    // 文件：路径相对被编译 crate 的 CARGO_MANIFEST_DIR，编译期读入
     let d = f2!("assets/secret.bin");
+    // 格式化字符串：字面量片段逐个混淆后走 `format!`，占位符照常使用，返回 `String`
+    let name = "world";
+    let greeting = s_fmt!("hello, {}!", name);
+    print!("{greeting}");
 }
 ```
 
@@ -170,4 +176,4 @@ MSRV 未在 `Cargo.toml` 声明，在`rustc 1.98.1`测试稳定。
 
 ## 开源协议 (License)
 
-[MIT License](LICENSE)
+[MIT License](./LICENSE)
