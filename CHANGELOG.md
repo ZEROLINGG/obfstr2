@@ -23,6 +23,19 @@
 
 ---
 
+## [0.1.5] - 2026-10-04
+
+### 新增 (Added)
+- 整数混淆宏 `i1!` / `i2!` / `i3!`（低延迟 / 均衡 / 高强度三档，输入 `42u8` / `-1` / `0xFFu16` 等整数字面量，空后缀视为 `i32`）：小端编码后复用同一套字节混淆内核（分块→加密→存储→发射），展开为对应裸整数值，可直接算术、比较、`let` 绑定传递；`usize` / `isize` 按 64 位语义编码（已知限制）；返回裸值，无 `Drop` 自动清零
+- 浮点混淆宏 `fl1!` / `fl2!` / `fl3!`（低延迟 / 均衡 / 高强度三档，输入 `3.15f32` / `-1.0` / `1e10` 等浮点字面量，空后缀视为 `f64`）：按 `to_bits` 小端编码后复用同一套字节混淆内核，展开为对应裸浮点值；仅接受有限常规值（`inf` / `NaN` 一律拒绝），`-0.0` 按位保留符号位；返回裸值，无 `Drop` 自动清零
+
+### 修复 (Fixed)
+- `core.rs` 存储策略空池回退（过滤为空时用 `static &[u8]` 兜底，避免 1B 小 chunk panic）；垃圾块存储按 `fake_chunk_size` 重过滤，不再复用真 chunk 的池
+- 消除 `obfstr2-macros` 在 CI 严格 clippy（`unwrap_used` / `expect_used`）下的 6 处告警：`float.rs` 取负分支改直接解析编码、`int.rs` / `float.rs` 测试 helper 改 `match` + `panic!`
+- `.gitignore` 追加 `*secret*`；双 `Cargo.toml` 的 `description` 与 `README` 一句话简介同步 `int/float` 新特性；刷新 `README_en.md` 的 `i18n-sync-anchor`
+
+---
+
 ## [0.1.4] - 2026-10-04
 
 ### 新增 (Added)

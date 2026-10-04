@@ -1,11 +1,13 @@
-//! `obfstr2` 的过程宏实现 crate：字符串 / 字节 / 文件编译期混淆入口。
+//! `obfstr2` 的过程宏实现 crate：字符串 / 字节 / 文件 / 整数 / 浮点编译期混淆入口。
 //!
-//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!` 九个宏（低延迟 / 均衡 / 高强度三档）；
+//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!`、`i1~3!`、`fl1~3!`（低延迟 / 均衡 / 高强度三档）与 `s_fmt!`；
 //! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use obfstr2_macros::*`）。
 mod bytes;
 mod combine;
 mod core;
 mod crypto;
+mod float;
+mod int;
 mod storage;
 mod str;
 
@@ -56,6 +58,26 @@ fn expand_bytes(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStre
     }
 }
 
+fn expand_int(
+    input: TokenStream,
+    build: fn(int::ParsedInt) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    match int::parse_int(input.into()) {
+        Ok(parsed) => build(parsed).into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+fn expand_float(
+    input: TokenStream,
+    build: fn(float::ParsedFloat) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    match float::parse_float(input.into()) {
+        Ok(parsed) => build(parsed).into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
 fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
     let path_lit = match syn::parse::<syn::LitStr>(input) {
         Ok(lit) => lit,
@@ -93,7 +115,7 @@ fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStrea
 /// ```
 #[proc_macro]
 pub fn s1(input: TokenStream) -> TokenStream {
-    expand_str(input, crate::str::s1)
+    expand_str(input, str::s1)
 }
 
 /// 字符串混淆宏（均衡档，对应 `s2`）。
@@ -109,7 +131,7 @@ pub fn s1(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn s2(input: TokenStream) -> TokenStream {
-    expand_str(input, crate::str::s2)
+    expand_str(input, str::s2)
 }
 
 /// 字符串混淆宏（高强度档，对应 `s3`）。
@@ -124,7 +146,7 @@ pub fn s2(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn s3(input: TokenStream) -> TokenStream {
-    expand_str(input, crate::str::s3)
+    expand_str(input, str::s3)
 }
 
 /// 字节串混淆宏（低延迟档，对应 `b1`）。
@@ -140,7 +162,7 @@ pub fn s3(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn b1(input: TokenStream) -> TokenStream {
-    expand_bytes(input, crate::bytes::b1)
+    expand_bytes(input, bytes::b1)
 }
 
 /// 字节串混淆宏（均衡档，对应 `b2`）。
@@ -155,7 +177,7 @@ pub fn b1(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn b2(input: TokenStream) -> TokenStream {
-    expand_bytes(input, crate::bytes::b2)
+    expand_bytes(input, bytes::b2)
 }
 
 /// 字节串混淆宏（高强度档，对应 `b3`）。
@@ -170,7 +192,7 @@ pub fn b2(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn b3(input: TokenStream) -> TokenStream {
-    expand_bytes(input, crate::bytes::b3)
+    expand_bytes(input, bytes::b3)
 }
 
 /// 文件混淆宏（低延迟档，对应 `b1`）。
@@ -188,7 +210,7 @@ pub fn b3(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn f1(input: TokenStream) -> TokenStream {
-    expand_file(input, crate::bytes::b1)
+    expand_file(input, bytes::b1)
 }
 
 /// 文件混淆宏（均衡档，对应 `b2`）。
@@ -203,7 +225,7 @@ pub fn f1(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn f2(input: TokenStream) -> TokenStream {
-    expand_file(input, crate::bytes::b2)
+    expand_file(input, bytes::b2)
 }
 
 /// 文件混淆宏（高强度档，对应 `b3`）。
@@ -218,7 +240,7 @@ pub fn f2(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn f3(input: TokenStream) -> TokenStream {
-    expand_file(input, crate::bytes::b3)
+    expand_file(input, bytes::b3)
 }
 
 /// 格式化字符串混淆宏（2 档，对应 `s2`）。
@@ -235,5 +257,100 @@ pub fn f3(input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro]
 pub fn s_fmt(input: TokenStream) -> TokenStream {
-    crate::combine::sfmt(input.into()).into()
+    combine::sfmt(input.into()).into()
+}
+
+/// 整数混淆宏（低延迟档，对应 `i1`）。
+///
+/// 只接受整数字面量（如 `42u8`、`-1`、`0xFFu16`，空后缀视为 `i32`），
+/// 展开为求值即得原文的裸整数表达式，可直接算术、比较、`let` 绑定传递。
+/// 注意：返回裸值，无 `Drop` 自动清零（与 `StackStr` 不同）。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（i1 同理）。
+/// use obfstr2::i1;
+/// let x = i1!(42u8);
+/// ```
+#[proc_macro]
+pub fn i1(input: TokenStream) -> TokenStream {
+    expand_int(input, int::i1)
+}
+
+/// 整数混淆宏（均衡档，对应 `i2`）。
+///
+/// 输入与展开规则同 [`i1`](i1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`。
+/// use obfstr2::i2;
+/// let x = i2!(-1);
+/// ```
+#[proc_macro]
+pub fn i2(input: TokenStream) -> TokenStream {
+    expand_int(input, int::i2)
+}
+
+/// 整数混淆宏（高强度档，对应 `i3`）。
+///
+/// 输入与展开规则同 [`i1`](i1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（i3 同理）。
+/// use obfstr2::i3;
+/// let x = i3!(0xFFu16);
+/// ```
+#[proc_macro]
+pub fn i3(input: TokenStream) -> TokenStream {
+    expand_int(input, int::i3)
+}
+
+/// 浮点混淆宏（低延迟档，对应 `fl1`）。
+///
+/// 只接受浮点字面量（如 `3.14f32`、`-1.0`、`1e10`，空后缀视为 `f64`），
+/// 展开为求值即得原文的裸浮点表达式，可直接算术、比较、`let` 绑定传递。
+/// 仅接受有限常规值：`inf` / `NaN` 一律拒绝；`-0.0` 按位保留符号位。
+/// 注意：返回裸值，无 `Drop` 自动清零（与 `StackStr` 不同）。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（fl1 同理）。
+/// use obfstr2::fl1;
+/// let x = fl1!(1.5f32);
+/// ```
+#[proc_macro]
+pub fn fl1(input: TokenStream) -> TokenStream {
+    expand_float(input, float::fl1)
+}
+
+/// 浮点混淆宏（均衡档，对应 `fl2`）。
+///
+/// 输入与展开规则同 [`fl1`](fl1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`。
+/// use obfstr2::fl2;
+/// let x = fl2!(3.15);
+/// ```
+#[proc_macro]
+pub fn fl2(input: TokenStream) -> TokenStream {
+    expand_float(input, float::fl2)
+}
+
+/// 浮点混淆宏（高强度档，对应 `fl3`）。
+///
+/// 输入与展开规则同 [`fl1`](fl1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（fl3 同理）。
+/// use obfstr2::fl3;
+/// let x = fl3!(-0.0);
+/// ```
+#[proc_macro]
+pub fn fl3(input: TokenStream) -> TokenStream {
+    expand_float(input, float::fl3)
 }

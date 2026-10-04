@@ -27,6 +27,20 @@ fn available_storage(chunk_size: usize, max_latency: u8) -> Vec<Storage> {
         .collect()
 }
 
+/// 选取存储策略：过滤为空时回退到首项（`static &[u8]`，恒可用），避免 1B 小 chunk panic。
+fn pick_storage(chunk_size: usize, max_latency: u8) -> Storage {
+    let mut pool = available_storage(chunk_size, max_latency);
+    if pool.is_empty() {
+        return STORAGE_STRATEGIES[0].clone();
+    }
+    pool.swap_remove(random_range(0..pool.len()))
+}
+
+/// 按 `fake_chunk_size` 重过滤的垃圾块存储策略（不复用真 chunk 的池，避免语义错配）。
+fn pick_fake_storage(fake_chunk_size: usize, max_latency: u8) -> Storage {
+    pick_storage(fake_chunk_size, max_latency)
+}
+
 /// 主流程的原语叠加选择：随机 `1~3 × magnification` 个起步，
 /// 组合安全度（`1 - Π(1 - security)`）达标即停，上限 16 层。
 fn select_stacked_ops(
@@ -136,10 +150,7 @@ pub(crate) fn build_obfuscated_bytes(
             dec_call.extend(dec_ts);
         }
 
-        let available_storages = available_storage(chunk_size, max_latency);
-
-        let storage_strategy =
-            available_storages[random_range(0..available_storages.len())].clone();
+        let storage_strategy = pick_storage(chunk_size, max_latency);
 
         match random_range(0..3) {
             0 => {
@@ -230,8 +241,7 @@ pub(crate) fn build_obfuscated_bytes(
                 fake_dec_call.extend(dec_ts);
             }
 
-            let fake_storage_strategy =
-                available_storages[random_range(0..available_storages.len())].clone();
+            let fake_storage_strategy = pick_fake_storage(fake_chunk_size, max_latency);
             let fake_chunk_type_expr = quote!(#chunk_type_path::<#fake_chunk_size>);
             let fake_storage_ast = (fake_storage_strategy.ast)(
                 &fake_bytes_chunk,

@@ -1,10 +1,10 @@
 [package]
 name = "obfstr2"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"
-description = "Polymorphic compile-time string/bytes/file obfuscation"
+description = "Polymorphic compile-time string/bytes/int/float/file obfuscation"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/ZEROLINGG/obfstr2"

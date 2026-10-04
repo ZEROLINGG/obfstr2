@@ -1,7 +1,7 @@
 # obfstr2
-<!-- i18n-sync-anchor: d007477851c63feb3a1406e274bd6d2d4d70dfa7 (source: README.md) -->
+<!-- i18n-sync-anchor: 72e24f6d1fc1805b58bc9c0b11a1545a325a0c41 (source: README.md) -->
 
-> **Polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible)**
+> **Polymorphic compile-time string/bytes/int/float/file obfuscation (`no_std` compatible)**
 
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
@@ -67,7 +67,7 @@ obfstr2 = "0.1"
 ```
 
 ```rust
-use obfstr2::{b2, f2, s2, s_fmt};
+use obfstr2::{b2, f2, fl2, i2, s2, s_fmt};
 
 fn main() {
     // Strings: evaluate to the original at runtime; owned containers that
@@ -78,6 +78,14 @@ fn main() {
     let b = b2!(b"abc");
     let c = b2!([0x61, 98, 99]);
     assert_eq!(&*b, &*c);
+    // Integers: evaluate to the original plain value, usable in arithmetic
+    // and comparisons directly (empty suffix means `i32`)
+    let x = i2!(42u32);
+    assert_eq!(x + 1, 43u32);
+    // Floats: evaluate to the original plain value (empty suffix means
+    // `f64`; `inf` / `NaN` are rejected)
+    let y = fl2!(3.15);
+    assert_eq!(y.to_bits(), 3.15f64.to_bits());
     // Files: path relative to the compiled crate's CARGO_MANIFEST_DIR,
     // read in at compile time
     let d = f2!("assets/fixture.bin");
@@ -95,12 +103,15 @@ fn main() {
 |---|---|---|
 | `s1!` / `s2!` / `s3!` | `"..."` string literals | Low-latency / Balanced / High-strength |
 | `b1!` / `b2!` / `b3!` | `b"..."` or `[0x41, 66, ...]` (elements must be 0..=255) | Low-latency / Balanced / High-strength |
+| `i1!` / `i2!` / `i3!` | `42u8` / `-1` / `0xFFu16` integer literals (empty suffix means `i32`) | Low-latency / Balanced / High-strength |
+| `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` float literals (empty suffix means `f64`) | Low-latency / Balanced / High-strength |
 | `f1!` / `f2!` / `f3!` | `"path/to/file"` file path literals | Low-latency / Balanced / High-strength |
 | `s_fmt!` | `"...{}..."` format string + args (tier 2) | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
 
 Notes:
 
-- String macros expand to `StackStr<N>` / `HeapStr<N>`, bytes and file macros to `StackBytes<N>` / `HeapBytes<N>`; the concrete type may vary between compilations — use type inference instead of fixed type annotations.
+- String macros expand to `StackStr<N>` / `HeapStr<N>`, bytes and file macros to `StackBytes<N>` / `HeapBytes<N>`, integer macros to the corresponding plain integer (`u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`u64`/`i64`/`u128`/`i128`/`usize`/`isize`, decided by the literal suffix), float macros to the corresponding plain float (`f32` / `f64`, decided by the literal suffix); the concrete type may vary between compilations — use type inference instead of fixed type annotations.
+- Integer / float macros reuse the same byte obfuscation kernel (integers little-endian encoded, floats encoded via `to_bits` little-endian, then chunk → encrypt → store → emit): the payload is always a single chunk with only 2 storage forms available; polymorphism comes from primitive stacking and emission forms; the plain value is returned with no `Drop` auto-wipe; `usize` / `isize` use 64-bit semantics (via `u64` / `i64`, then `as` cast); floats accept only finite ordinary values (`inf` / `NaN` are rejected), `-0.0` keeps its sign bit, and assertions should use `to_bits()` instead of `==`.
 - Obfuscation output differs on every compilation (compile-time randomness); the same macro invocation never reproduces an identical byte stream.
 
 ## Use Cases vs Non-Use Cases

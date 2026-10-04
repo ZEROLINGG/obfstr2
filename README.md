@@ -1,6 +1,6 @@
 # obfstr2
 
-> **Polymorphic compile-time string/bytes/file obfuscation**
+> **Polymorphic compile-time string/bytes/int/float/file obfuscation**
 
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
@@ -12,7 +12,7 @@
 
 **语言：** [English](README_en.md) | 简体中文
 
-Polymorphic compile-time string/bytes/file obfuscation（no_std 兼容）。
+Polymorphic compile-time string/bytes/int/float/file obfuscation（no_std 兼容）。
 
 与 [CasualX/obfstr](https://github.com/CasualX/obfstr) 同类但路线不同：CasualX 以极小的展开体积实现开箱即用的字符串隐藏；obfstr2 则以约 6 倍的展开体积换取多形态防御——随机分块、原语随机叠加、多存储形态、垃圾代码干扰，使同一输入每次编译产出不同密文，批量还原脚本无法复用固定模式。另一关键差异是数据生命周期：obfstr2 的容器类型（`lib-unknown` 提供）在 `Drop` 时自动 volatile 清零，解密出的明文用完即擦，不会残留在栈 / 堆上。这就是为什么要有 obfstr2：**更高的逆向成本、更多态的混淆、敏感数据生命周期结束自动擦除**。
 
@@ -66,7 +66,7 @@ obfstr2 = "0.1"
 ```
 
 ```rust
-use obfstr2::{b2, f2, s2, s_fmt};
+use obfstr2::{b2, f2, fl2, i2, s2, s_fmt};
 
 fn main() {
     // 字符串：求值即得原文，返回自有容器，可绑定、传递、复用
@@ -76,6 +76,12 @@ fn main() {
     let b = b2!(b"abc");
     let c = b2!([0x61, 98, 99]);
     assert_eq!(&*b, &*c);
+    // 整数：求值即得原文裸值，可直接算术、比较（空后缀视为 `i32`）
+    let x = i2!(42u32);
+    assert_eq!(x + 1, 43u32);
+    // 浮点：求值即得原文裸值（空后缀视为 `f64`，`inf` / `NaN` 拒绝）
+    let y = fl2!(3.15);
+    assert_eq!(y.to_bits(), 3.15f64.to_bits());
     // 文件：路径相对被编译 crate 的 CARGO_MANIFEST_DIR，编译期读入
     let d = f2!("assets/fixture.bin");
     // 格式化字符串：字面量片段逐个混淆后走 `format!`，占位符照常使用，返回 `String`
@@ -91,12 +97,15 @@ fn main() {
 |---|---|---|
 | `s1!` / `s2!` / `s3!` | `"..."` 字符串字面量 | 低延迟 / 均衡 / 高强度 |
 | `b1!` / `b2!` / `b3!` | `b"..."` 或 `[0x41, 66, ...]`（元素 0..=255） | 低延迟 / 均衡 / 高强度 |
+| `i1!` / `i2!` / `i3!` | `42u8` / `-1` / `0xFFu16` 等整数字面量（空后缀视为 `i32`） | 低延迟 / 均衡 / 高强度 |
+| `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` 等浮点字面量（空后缀视为 `f64`） | 低延迟 / 均衡 / 高强度 |
 | `f1!` / `f2!` / `f3!` | `"path/to/file"` 文件路径字面量 | 低延迟 / 均衡 / 高强度 |
 | `s_fmt!` | `"...{}..."` 格式串 + 参数（2 档） | 字面量片段混淆后走 `format!`，返回 `String`（需 `std` / `alloc`） |
 
 说明：
 
-- 字符串宏展开为 `StackStr<N>` / `HeapStr<N>`，字节与文件宏展开为 `StackBytes<N>` / `HeapBytes<N>`；返回的具体类型可能随编译变化，请使用类型推断，不要写死类型标注。
+- 字符串宏展开为 `StackStr<N>` / `HeapStr<N>`，字节与文件宏展开为 `StackBytes<N>` / `HeapBytes<N>`，整数宏展开为对应裸整数值（`u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`u64`/`i64`/`u128`/`i128`/`usize`/`isize`，由字面量后缀决定），浮点宏展开为对应裸浮点值（`f32` / `f64`，由字面量后缀决定）；返回的具体类型可能随编译变化，请使用类型推断，不要写死类型标注。
+- 整数 / 浮点宏复用同一套字节混淆内核（整数小端编码、浮点按 `to_bits` 小端编码后走分块→加密→存储→发射）：载荷恒为单 chunk，可用存储形态仅 2 种，多态性靠原语叠加与发射形态维持；返回裸值，无 `Drop` 自动清零；`usize` / `isize` 按 64 位语义编码（`u64` / `i64` 中转后 `as` 转换）；浮点仅接受有限常规值（`inf` / `NaN` 一律拒绝），`-0.0` 按位保留符号位，断言请用 `to_bits()` 而非 `==`。
 - 每次编译的混淆结果都不同（编译期随机），同一宏名的输出字节流不可复现。
 
 ## 适用场景 vs 不适用场景

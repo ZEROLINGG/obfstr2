@@ -17,6 +17,7 @@ logs/
 id_rsa
 id_rsa.pub
 *credentials*
+*secret*
 
 # ========== 日志与临时文件 ==========
 *.log

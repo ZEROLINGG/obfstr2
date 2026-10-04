@@ -48,6 +48,69 @@ fn missing_file_rejected() {
 }
 
 #[test]
+fn int_out_of_range_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::i2!(256u8); }"#,
+        "超出 u8 范围",
+        "i2-range",
+    );
+}
+
+#[test]
+fn int_negative_for_unsigned_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::i2!(-1u8); }"#,
+        "负数不能用于无符号",
+        "i2-neg-unsigned",
+    );
+}
+
+#[test]
+fn int_non_literal_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::i2!(u64::MAX); }"#,
+        "只接受整数字面量",
+        "i2-lit",
+    );
+}
+
+#[test]
+fn int_bad_suffix_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::i2!(1u256); }"#,
+        "后缀",
+        "i2-suffix",
+    );
+}
+
+#[test]
+fn float_overflow_to_inf_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::fl2!(1e999f32); }"#,
+        "无穷",
+        "fl2-inf",
+    );
+}
+
+#[test]
+fn float_non_literal_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::fl2!(f64::MAX); }"#,
+        "只接受浮点字面量",
+        "fl2-lit",
+    );
+}
+
+#[test]
+fn float_bad_suffix_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _x = obfstr2::fl2!(1.0f16); }"#,
+        "后缀",
+        "fl2-suffix",
+    );
+}
+
+#[test]
 fn s_fmt_non_literal_rejected() {
     assert_compile_fail(
         r#"fn main() { let f = "x"; print!("{}", obfstr2::s_fmt!(f)) }"#,

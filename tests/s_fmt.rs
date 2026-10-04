@@ -1,9 +1,4 @@
 //! `s_fmt!` 与标准 `format!` 的等价性测试（进程内断言）。
-//!
-//! 替代原 `combine.rs::e2e_tests` 的 dyntest+stdout 行解析方案：
-//! 原方案对 `{v:#?}` 这类多行 pretty-debug 输出会错位解析
-//!（`actual` 取到 `    1,`，见旧失败用例），此处直接在同一表达式内
-//! `assert_eq!`，天然免疫换行/特殊字符。
 use obfstr2::s_fmt;
 
 #[test]
