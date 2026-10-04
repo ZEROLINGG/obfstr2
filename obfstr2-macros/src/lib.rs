@@ -4,6 +4,9 @@
 //! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use obfstr2_macros::*`）。
 mod bytes;
 mod combine;
+mod core;
+mod crypto;
+mod storage;
 mod str;
 
 use proc_macro::TokenStream;
