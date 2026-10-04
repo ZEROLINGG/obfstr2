@@ -20,9 +20,6 @@ Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a diffe
 - Same: literals in, expressions out; `no_std` compatible; obfuscation done at compile time, with `lib-unknown` as the only runtime dependency.
 - Different: CasualX macros return a reference borrowing a temporary (`let x = obfstr!(...)` triggers E0716 and can only be used inline), while obfstr2 returns owned containers (plain values for `i/fl`) that can be bound, passed around, and reused; CasualX expands to a single fixed form, obfstr2 takes a different form on every compilation; CasualX focuses on strings, obfstr2 additionally covers integers / floats / files / format strings (see the comparison table under Benchmarks for type width and formatting support).
 
-Randomness and crypto primitives come from [`lib-unknown`](https://github.com/ZEROLINGG/lib-unknown).
-
-
 ## Contents
 
 - [Design Philosophy](#design-philosophy)

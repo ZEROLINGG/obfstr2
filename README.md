@@ -19,8 +19,6 @@ Polymorphic compile-time string/bytes/int/float/file obfuscation（no_std 兼容
 - 同：字面量进、表达式出；`no_std` 可用；混淆在编译期完成、运行时仅依赖 `lib-unknown`。
 - 异：CasualX 宏返回借用临时值的引用（`let x = obfstr!(...)` 会触发 E0716，只能内联使用），obfstr2 返回自有容器（`i/fl` 为裸值），可绑定、传递、复用；CasualX 单形态展开，obfstr2 每次编译形态皆不同；CasualX 以字符串为主，obfstr2 另有整数 / 浮点 / 文件 / 格式化四类宏（类型宽度与格式化支持见性能对比表）。
 
-底层随机数与密码原语来自 [`lib-unknown`](https://github.com/ZEROLINGG/lib-unknown)。
-
 
 ## 目录
 
