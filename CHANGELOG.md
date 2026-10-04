@@ -16,6 +16,19 @@
 -
 
 ### 变更 (Changed)
+-
+
+### 修复 (Fixed)
+-
+
+---
+
+## [0.1.4] - 2026-10-04
+
+### 新增 (Added)
+-
+
+### 变更 (Changed)
 - 测试分层迁移：宏正确性（`s1~3/b1~3/f1~3`）与 `s_fmt` 对拍迁入根 `tests/smoke.rs` / `tests/s_fmt.rs`（进程内断言，毫秒级）；非法输入与裸机链路迁入根 `tests/compile_fail.rs` / `tests/nostd.rs`（各用例隔离的 dyntest 工程，无共享 `RUNNER`）；`obfstr2-macros` 内仅留纯单元测试（格式串切分、多态展开）；移除 `macros` 对 `dyntest` 的 dev 依赖；README 中英贡献指引同步
 - 双 `Cargo.toml` 补 `rust-version = "1.98"`，与 README 徽章/MSRV 章节对齐
 - `assets/secret.bin` 改名 `assets/fixture.bin`（内容不变），避免文件名命中密钥扫描规则；`f2!` 示例（中英 README）与宏文档同步
