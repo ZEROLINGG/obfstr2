@@ -22,3 +22,6 @@ default = [
     "lib-unknown/alloc",
     "obfstr2-macros/alloc"
 ]
+
+[dev-dependencies]
+lib-unknown = { version = "0.1", features = ["dyntest", "std"] }

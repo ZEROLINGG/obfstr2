@@ -16,12 +16,16 @@
 -
 
 ### 变更 (Changed)
+- 测试分层迁移：宏正确性（`s1~3/b1~3/f1~3`）与 `s_fmt` 对拍迁入根 `tests/smoke.rs` / `tests/s_fmt.rs`（进程内断言，毫秒级）；非法输入与裸机链路迁入根 `tests/compile_fail.rs` / `tests/nostd.rs`（各用例隔离的 dyntest 工程，无共享 `RUNNER`）；`obfstr2-macros` 内仅留纯单元测试（格式串切分、多态展开）；移除 `macros` 对 `dyntest` 的 dev 依赖；README 中英贡献指引同步
 - 双 `Cargo.toml` 补 `rust-version = "1.98"`，与 README 徽章/MSRV 章节对齐
 - `assets/secret.bin` 改名 `assets/fixture.bin`（内容不变），避免文件名命中密钥扫描规则；`f2!` 示例（中英 README）与宏文档同步
 - `README_en.md` 的 `i18n-sync-anchor` 刷新至当前 `README.md`
 - `.gitignore` 追加环境变量/密钥/临时文件标准条目（`Cargo.lock` 忽略行保持不动，见报告说明）
 
 ### 修复 (Fixed)
+- `s_fmt` 端到端对多行 pretty-debug 输出（`{v:#?}`）按行解析错位导致误报，改为被测程序内 `assert_eq!`，天然免疫换行
+- `clear_dny_project(None)` 与并行测试互相等待存活锁导致 `cargo test` 挂起（`clear` 用例运行超 60 秒），删除全局清理与共享工程，改各用例独立目录
+- 裸机模板缺全局分配器，`b2` 随机展开为 `HeapBytes` 时链接失败，模板补极简 bump 分配器；`b1` 增 `default-features = false` 真无分配覆盖
 - 移除 6 处文件顶 `#![allow(unused)]`（根 `src/lib.rs` + macros 的 `bytes/core/crypto/storage/str`），`unused` 检查恢复生效；顺带清理其掩盖的 4 处问题：`str.rs` 删除 3 个未用导入（`Literal2`/`format_ident`/`LazyLock`），`bytes.rs` 测试 helper 删除未用 `input` 变量；`Storage::security` 当前仅作注册表元数据（选择逻辑暂只按 `support`/`latency` 过滤），改为单字段 `#[allow(dead_code)]` 并注明预留用途
 
 ---

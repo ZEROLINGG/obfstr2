@@ -21,9 +21,6 @@ proc-macro2 = "1.0"
 
 lib-unknown = { version = "0.1", default-features = false, features = ["rand", "rand-expand", "crypto", "dyntest", "std"]}
 
-[dev-dependencies]
-lib-unknown = { version = "0.1", features = ["dyntest", "std"] }
-
 [features]
 default = [
 ]

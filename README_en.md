@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 7c4de245b2f3ecda4451ad3cfc05f7dd34973527 (source: README.md) -->
+<!-- i18n-sync-anchor: d007477851c63feb3a1406e274bd6d2d4d70dfa7 (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible)**
 
@@ -172,7 +172,11 @@ If you find a security vulnerability, please file an Issue directly (this repo h
 
 Issues and Pull Requests are welcome!
 
-- Local verification: `cd obfstr2-macros && cargo test --lib` (dyntest compiles scratch projects on the fly; the full suite takes several minutes).
+- Local verification (layered, ~15s with warm cache):
+  - `cargo test --test smoke --test s_fmt`: correctness of all macros, in-process assertions, milliseconds;
+  - `cargo test --test compile_fail`: compile-time rejection of invalid inputs (isolated dyntest projects per case);
+  - `cargo test --test nostd`: `x86_64-unknown-none` bare-metal link (`b1` pure-stack without allocator + `b2` with heap; install that target first);
+  - `cd obfstr2-macros && cargo test --lib`: pure unit tests (format-string splitting, polymorphic expansion, milliseconds).
 - Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries (in `obfstr2-macros/src/crypto.rs` and `storage.rs` respectively) and leave the orchestration layer (`core.rs::build_obfuscated_bytes`) untouched.
 
 ## Changelog

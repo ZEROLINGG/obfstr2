@@ -167,7 +167,11 @@ MSRV 未在 `Cargo.toml` 声明，在`rustc 1.98.1`测试稳定。
 
 欢迎提交 Issue 和 Pull Request！
 
-- 本地验证：`cd obfstr2-macros && cargo test --lib`（dyntest 会现场编译临时工程，完整套件约需数分钟）。
+- 本地验证（分层，增量缓存下约 15 秒）：
+  - `cargo test --test smoke --test s_fmt`：全部宏正确性，进程内断言，毫秒级；
+  - `cargo test --test compile_fail`：非法输入的编译期拒绝（各用例隔离的 dyntest 工程）；
+  - `cargo test --test nostd`：`x86_64-unknown-none` 裸机链路（`b1` 纯栈无分配 + `b2` 含堆，需安装该 target）；
+  - `cd obfstr2-macros && cargo test --lib`：纯单元测试（格式串切分、多态展开，毫秒级）。
 - 提交 PR 前请先阅读[设计哲学](#设计哲学-design-philosophy)：新增混淆原语请以 `Crypto` / `Storage` 表项形式接入（分别位于 `obfstr2-macros/src/crypto.rs` 与 `storage.rs`），编排层（`core.rs::build_obfuscated_bytes`）保持不动。
 
 ## 变更日志 (Changelog)

@@ -87,7 +87,7 @@ fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStrea
 ///
 /// ```rust,ignore
 /// // 过程宏无法在定义 crate 内 doctest（需外部调用方展开）；
-/// // 覆盖见 `tests::test_s2_macro` 的 dyntest 端到端用例（s1 同理）。
+/// // 覆盖见根 crate `tests/smoke.rs`（s1 同理）。
 /// use obfstr2::s1;
 /// let s = s1!("hello");
 /// ```
@@ -103,7 +103,7 @@ pub fn s1(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_s2_macro`。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`。
 /// use obfstr2::s2;
 /// let s = s2!("hello");
 /// ```
@@ -118,7 +118,7 @@ pub fn s2(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_s2_macro`（s3 同理）。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（s3 同理）。
 /// use obfstr2::s3;
 /// let s = s3!("hello");
 /// ```
@@ -134,7 +134,7 @@ pub fn s3(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_b2_macro`（b1 同理）。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（b1 同理）。
 /// use obfstr2::b1;
 /// let b = b1!(b"abc");
 /// ```
@@ -149,7 +149,7 @@ pub fn b1(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_b2_macro`。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`。
 /// use obfstr2::b2;
 /// let b = b2!([0x61, 98, 99]);
 /// ```
@@ -164,7 +164,7 @@ pub fn b2(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_b2_macro`（b3 同理）。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（b3 同理）。
 /// use obfstr2::b3;
 /// let b = b3!(b"abc");
 /// ```
@@ -182,7 +182,7 @@ pub fn b3(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`（f1 同理）。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（f1 同理）。
 /// use obfstr2::f1;
 /// let b = f1!("assets/fixture.bin");
 /// ```
@@ -197,7 +197,7 @@ pub fn f1(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`。
 /// use obfstr2::f2;
 /// let b = f2!("assets/fixture.bin");
 /// ```
@@ -212,7 +212,7 @@ pub fn f2(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`（f3 同理）。
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（f3 同理）。
 /// use obfstr2::f3;
 /// let b = f3!("assets/fixture.bin");
 /// ```
@@ -229,148 +229,11 @@ pub fn f3(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // 同 s2：不可 doctest，覆盖见 `tests::test_s_fmt_macro`。
+/// // 同 s2：不可 doctest，覆盖见根 crate `tests/s_fmt.rs`。
 /// use obfstr2::s_fmt;
 /// let s = s_fmt!("hello {}", name);
 /// ```
 #[proc_macro]
 pub fn s_fmt(input: TokenStream) -> TokenStream {
     crate::combine::sfmt(input.into()).into()
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod tests {
-    use lib_unknown::dyntest::dny_run;
-
-    fn run_case(code: &str, expected: &str, tag: &str) {
-        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
-        let ret = dny_run(code, deps, None, false);
-        println!("{ret}");
-        assert!(ret.stderr.is_empty(), "[{tag}] 编译失败");
-        assert_eq!(ret.stdout, expected, "[{tag}] 解码数据错误");
-    }
-
-    #[test]
-    fn test_s2_macro() {
-        run_case(
-            r#"fn main() { print!("{}", obfstr2::s2!("hello")) }"#,
-            "hello",
-            "s2",
-        );
-    }
-
-    #[test]
-    fn test_b2_macro() {
-        run_case(
-            r#"fn main() { let b = obfstr2::b2!(b"abc"); for x in &*b { print!("{}", *x as char) } }"#,
-            "abc",
-            "b2",
-        );
-    }
-
-    #[test]
-    fn test_b2_array_macro() {
-        // 十六进制/十进制混写 + 边界值 0/255
-        run_case(
-            r#"fn main() { let b = obfstr2::b2!([0x61, 98, 0, 255]); for x in &*b { print!("{} ", *x) } }"#,
-            "97 98 0 255 ",
-            "b2-array",
-        );
-    }
-
-    #[test]
-    fn test_f2_macro() {
-        // 生成的临时工程必含 src/main.rs：解码后与 include_bytes! 逐字节比对
-        run_case(
-            r#"fn main() { let b = obfstr2::f2!("src/main.rs"); assert_eq!(&*b, include_bytes!("main.rs")); print!("OK") }"#,
-            "OK",
-            "f2",
-        );
-    }
-
-    #[test]
-    fn test_f_missing_rejected() {
-        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
-        let ret = dny_run(
-            r#"fn main() { let _b = obfstr2::f2!("不存在的文件.bin"); }"#,
-            deps,
-            None,
-            false,
-        );
-        assert!(!ret.ok, "缺失文件应当编译失败");
-        assert!(
-            ret.stderr.contains("无法读取文件"),
-            "错误信息应提示无法读取文件，实际 stderr:\n{}",
-            ret.stderr
-        );
-    }
-    #[test]
-    fn test_s_fmt_macro() {
-        run_case(
-            r#"fn main() { let name = "world"; print!("{}", obfstr2::s_fmt!("hello {}", name)) }"#,
-            "hello world",
-            "s_fmt",
-        );
-    }
-
-    #[test]
-    fn test_s_fmt_escaped_braces() {
-        run_case(
-            r#"fn main() { let v = 42; print!("{}", obfstr2::s_fmt!("{{hi}} {}-{v:?}", v)) }"#,
-            "{hi} 42-42",
-            "s_fmt-escaped",
-        );
-    }
-
-    #[test]
-    fn test_s_fmt_rejects_non_literal() {
-        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
-        let ret = dny_run(
-            r#"fn main() { let f = "x"; print!("{}", obfstr2::s_fmt!(f)) }"#,
-            deps,
-            None,
-            false,
-        );
-        assert!(!ret.ok, "非字面量首参应当编译失败");
-        assert!(
-            ret.stderr.contains("必须是字符串字面量"),
-            "错误信息应提示字面量要求，实际 stderr:\n{}",
-            ret.stderr
-        );
-    }
-
-    #[test]
-    fn test_s_fmt_rejects_unclosed_brace() {
-        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
-        let ret = dny_run(
-            r#"fn main() { print!("{}", obfstr2::s_fmt!("a{b")) }"#,
-            deps,
-            None,
-            false,
-        );
-        assert!(!ret.ok, "未闭合括号应当编译失败");
-        assert!(
-            ret.stderr.contains("未闭合"),
-            "错误信息应提示未闭合，实际 stderr:\n{}",
-            ret.stderr
-        );
-    }
-
-    #[test]
-    fn test_b_array_rejects_out_of_range() {
-        let deps = r#"obfstr2 = { path = "../../../../../obfstr2" }"#;
-        let ret = dny_run(
-            r#"fn main() { let _b = obfstr2::b2!([0x61, 300]); }"#,
-            deps,
-            None,
-            false,
-        );
-        assert!(!ret.ok, "越界元素应当编译失败");
-        assert!(
-            ret.stderr.contains("0..=255"),
-            "错误信息应提示取值范围，实际 stderr:\n{}",
-            ret.stderr
-        );
-    }
 }
