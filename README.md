@@ -77,7 +77,7 @@ fn main() {
     let c = b2!([0x61, 98, 99]);
     assert_eq!(&*b, &*c);
     // 文件：路径相对被编译 crate 的 CARGO_MANIFEST_DIR，编译期读入
-    let d = f2!("assets/secret.bin");
+    let d = f2!("assets/fixture.bin");
     // 格式化字符串：字面量片段逐个混淆后走 `format!`，占位符照常使用，返回 `String`
     let name = "world";
     let greeting = s_fmt!("hello, {}!", name);

@@ -1,4 +1,3 @@
-#![allow(unused)]
 //! 多态密文存储策略注册表（`Storage` + `STORAGE_STRATEGIES`）。
 //!
 
@@ -15,6 +14,9 @@ pub(crate) struct Storage {
     // 判断当前 chunk 长度是否适合此策略
     pub(crate) support: fn(usize) -> bool,
     // 抗分析能力（如伪装度，打断静态扫描的能力） 0~100
+    // 当前仅作注册表元数据记录（选择逻辑暂只按 support/latency 过滤，
+    // 预留给后续加权选择），故对 dead_code 单字段豁免。
+    #[allow(dead_code)]
     pub(crate) security: u8,
     // 运行时恢复数据的性能开销 0~100
     pub(crate) latency: u8,

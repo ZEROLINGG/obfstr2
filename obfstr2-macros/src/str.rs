@@ -1,9 +1,7 @@
-#![allow(unused)]
 use crate::bytes::{b1, b2, b3};
 use lib_unknown::rand::random;
-use proc_macro2::{Literal as Literal2, TokenStream as TokenStream2};
-use quote::{format_ident, quote};
-use std::sync::LazyLock;
+use proc_macro2::TokenStream as TokenStream2;
+use quote::quote;
 
 pub fn s1(input: String) -> TokenStream2 {
     let size = input.len();

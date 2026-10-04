@@ -175,7 +175,7 @@ pub fn b3(input: TokenStream) -> TokenStream {
 
 /// 文件混淆宏（低延迟档，对应 `b1`）。
 ///
-/// 接受文件路径字面量（如 `"assets/secret.bin"`，相对于被编译 crate 的
+/// 接受文件路径字面量（如 `"assets/fixture.bin"`，相对于被编译 crate 的
 /// `CARGO_MANIFEST_DIR` 解析），编译期读入文件内容并混淆，展开为求值即得
 /// 文件原文的字节容器表达式（`StackBytes<N>` / `HeapBytes<N>`）。
 /// 需自行保证文件存在；文件缺失或不可读时报编译错误。
@@ -184,7 +184,7 @@ pub fn b3(input: TokenStream) -> TokenStream {
 /// ```rust,ignore
 /// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`（f1 同理）。
 /// use obfstr2::f1;
-/// let b = f1!("assets/secret.bin");
+/// let b = f1!("assets/fixture.bin");
 /// ```
 #[proc_macro]
 pub fn f1(input: TokenStream) -> TokenStream {
@@ -199,7 +199,7 @@ pub fn f1(input: TokenStream) -> TokenStream {
 /// ```rust,ignore
 /// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`。
 /// use obfstr2::f2;
-/// let b = f2!("assets/secret.bin");
+/// let b = f2!("assets/fixture.bin");
 /// ```
 #[proc_macro]
 pub fn f2(input: TokenStream) -> TokenStream {
@@ -214,7 +214,7 @@ pub fn f2(input: TokenStream) -> TokenStream {
 /// ```rust,ignore
 /// // 同 s1：不可 doctest，覆盖见 `tests::test_f2_macro`（f3 同理）。
 /// use obfstr2::f3;
-/// let b = f3!("assets/secret.bin");
+/// let b = f3!("assets/fixture.bin");
 /// ```
 #[proc_macro]
 pub fn f3(input: TokenStream) -> TokenStream {

@@ -16,10 +16,13 @@
 -
 
 ### 变更 (Changed)
--
+- 双 `Cargo.toml` 补 `rust-version = "1.98"`，与 README 徽章/MSRV 章节对齐
+- `assets/secret.bin` 改名 `assets/fixture.bin`（内容不变），避免文件名命中密钥扫描规则；`f2!` 示例（中英 README）与宏文档同步
+- `README_en.md` 的 `i18n-sync-anchor` 刷新至当前 `README.md`
+- `.gitignore` 追加环境变量/密钥/临时文件标准条目（`Cargo.lock` 忽略行保持不动，见报告说明）
 
 ### 修复 (Fixed)
--
+- 移除 6 处文件顶 `#![allow(unused)]`（根 `src/lib.rs` + macros 的 `bytes/core/crypto/storage/str`），`unused` 检查恢复生效；顺带清理其掩盖的 4 处问题：`str.rs` 删除 3 个未用导入（`Literal2`/`format_ident`/`LazyLock`），`bytes.rs` 测试 helper 删除未用 `input` 变量；`Storage::security` 当前仅作注册表元数据（选择逻辑暂只按 `support`/`latency` 过滤），改为单字段 `#[allow(dead_code)]` 并注明预留用途
 
 ---
 

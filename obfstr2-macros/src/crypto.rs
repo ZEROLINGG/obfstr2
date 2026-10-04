@@ -1,4 +1,3 @@
-#![allow(unused)]
 //! 多态加解密原语注册表（`Crypto` + `PRIMITIVES`）。
 //!
 

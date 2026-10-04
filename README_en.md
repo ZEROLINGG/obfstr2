@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 365d09b1baabab30bab905be0f58acac931c28de (source: README.md) -->
+<!-- i18n-sync-anchor: 7c4de245b2f3ecda4451ad3cfc05f7dd34973527 (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible)**
 
@@ -80,7 +80,7 @@ fn main() {
     assert_eq!(&*b, &*c);
     // Files: path relative to the compiled crate's CARGO_MANIFEST_DIR,
     // read in at compile time
-    let d = f2!("assets/secret.bin");
+    let d = f2!("assets/fixture.bin");
     // Format strings: literal chunks are obfuscated one by one, then go
     // through `format!`; placeholders work as usual, returns `String`
     let name = "world";

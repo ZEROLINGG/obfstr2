@@ -1,4 +1,3 @@
-#![allow(unused)]
 //! 字节档位入口：`b1` / `b2` / `b3`（低延迟 / 均衡 / 高强度）。
 //!
 //! 注册表见 `crate::crypto` / `crate::storage`，编排见 `crate::core`，
@@ -239,7 +238,6 @@ fn main() -> usize {
 }
 
 "#;
-        let input = String::from_utf8(vec![97; 1024]).unwrap();
         let code = template.replace("[[bytes]]", call);
         let deps = source;
         println!("[{tag}] Code size: {}\n{:.128}...", code.len(), code);

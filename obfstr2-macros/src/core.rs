@@ -1,4 +1,3 @@
-#![allow(unused)]
 //! 混淆编排核心：分块 → 加密 → 存储 → 发射（`build_obfuscated_bytes`）。
 //!
 //! 从 `bytes.rs` 拆分而来：注册表见 `crate::crypto` / `crate::storage`，

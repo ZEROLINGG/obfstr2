@@ -3,6 +3,23 @@ Cargo.lock
 logs/
 
 *.rs.bk
+*.pdb
 .DS_Store
 .idea/
 .vscode/
+
+# ========== 环境变量与密钥（防止误提交敏感信息） ==========
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+*credentials*
+
+# ========== 日志与临时文件 ==========
+*.log
+*.swp
+*.swo
+*~
