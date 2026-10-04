@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 72e24f6d1fc1805b58bc9c0b11a1545a325a0c41 (source: README.md) -->
+<!-- i18n-sync-anchor: 55eb26db1fc115280b5cb394b8902afe010b2ebd (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/file obfuscation (`no_std` compatible)**
 
@@ -13,12 +13,12 @@
 
 **Languages:** [简体中文](README.md) | English
 
-A polymorphic compile-time string/bytes/file obfuscation (`no_std` compatible).
+A polymorphic compile-time string/bytes/int/float/file obfuscation (`no_std` compatible).
 
-Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a different trade-off: CasualX delivers out-of-the-box string hiding with minimal expansion size, while obfstr2 trades roughly 6× expansion size for polymorphic defense — random chunking, randomly stacked primitives, multiple alternative storage forms, and junk-code interference — so the same input produces different ciphertext on every compilation, and batch recovery scripts cannot reuse a fixed pattern. Another key difference is data lifetime: obfstr2's container types (provided by `lib-unknown`) are automatically volatile-zeroed on `Drop`, so decrypted plaintext is wiped as soon as it is used instead of lingering on the stack / heap. That is why obfstr2 exists: **higher reverse-engineering cost, more polymorphic obfuscation, and automatic erasure of sensitive data at the end of its lifetime**.
+Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a different trade-off: CasualX delivers out-of-the-box string hiding with minimal expansion size, while obfstr2 trades several times the expansion size for polymorphic defense — random chunking, randomly stacked primitives, multiple alternative storage forms, and junk-code interference — so the same input produces different ciphertext on every compilation, and batch recovery scripts cannot reuse a fixed pattern. Coverage goes beyond strings: on top of the `s/b/f` families, `i1~3!` / `fl1~3!` cover all integer and float literals (expanding to directly usable plain values), and `s_fmt!` covers format strings (literal chunks obfuscated one by one, then passed to `format!`) — six input kinds through the same chunk → encrypt → store → emit kernel. Another key difference is data lifetime: obfstr2's container types (provided by `lib-unknown`) are automatically volatile-zeroed on `Drop`, so decrypted plaintext is wiped as soon as it is used instead of lingering on the stack / heap (`s/b/f` containers; `i/fl` return plain values and `s_fmt!` returns `String`, with no automatic erasure — see the macro overview). That is why obfstr2 exists: **higher reverse-engineering cost, more polymorphic obfuscation, wider type coverage, and automatic erasure of sensitive data at the end of its lifetime**.
 
 - Same: literals in, expressions out; `no_std` compatible; obfuscation done at compile time, with `lib-unknown` as the only runtime dependency.
-- Different: CasualX macros return a reference borrowing a temporary (`let x = obfstr!(...)` triggers E0716 and can only be used inline), while obfstr2 returns owned containers that can be bound, passed around, and reused; CasualX expands to a single fixed form, obfstr2 takes a different form on every compilation.
+- Different: CasualX macros return a reference borrowing a temporary (`let x = obfstr!(...)` triggers E0716 and can only be used inline), while obfstr2 returns owned containers (plain values for `i/fl`) that can be bound, passed around, and reused; CasualX expands to a single fixed form, obfstr2 takes a different form on every compilation; CasualX focuses on strings, obfstr2 additionally covers integers / floats / files / format strings (see the comparison table under Benchmarks for type width and formatting support).
 
 Randomness and crypto primitives come from [`lib-unknown`](https://github.com/ZEROLINGG/lib-unknown).
 
@@ -45,6 +45,7 @@ Randomness and crypto primitives come from [`lib-unknown`](https://github.com/ZE
 1. **Extreme polymorphism** — the same input compiles to a different ciphertext form every time: random chunking (incrementally randomized `2i..8i` splits), randomly stacked crypto primitives (`1–3 × magnification`, stopping once the combined security level is reached), multiple randomly chosen storage forms (byte strings, `u8` / `u64` / `u128` arrays, MAC / UUID / IPv6 steganographic disguises, etc.), plus junk code and `ghost_state` interference. Batch recovery scripts cannot rely on a fixed pattern.
 2. **Abstracted obfuscation pipeline** — all algorithms converge into two registries: `Crypto { enc / dec / support / security / latency }` (polymorphic encryption/decryption) and `Storage { ast / support / security / latency }` (polymorphic ciphertext storage); `build_obfuscated_bytes` only orchestrates chunk → encrypt → store → emit. New algorithms just add table entries without touching the pipeline.
 3. **Compile-time evaluation, minimal runtime dependencies** — proc macros expand to a closed token stream; obfuscation is done at compile time, and at runtime only `lib-unknown`'s `types` and `crypto` are needed; `no_std` compatible; invariants already verified at expansion time use `unwrap_unchecked` with no runtime checking overhead.
+4. **Out-of-the-box usability** — callers write a single macro: literals in, expressions out, with no initialization, key management, or runtime configuration; tier numbering is uniform across all families (`1` = low-latency, `2` = balanced, `3` = high-strength); results are owned containers or plain values that can be `let`-bound, passed around, and reused without fixed type annotations; invalid inputs fail at compile time pointing at the call site. Polymorphic complexity stays inside the macro and never leaks cognitive load to the caller.
 
 ### Trade-offs
 
@@ -156,23 +157,27 @@ End-to-end dyntest measurements below (1024-byte input, dev profile; expanded co
 
 ### Comparison with CasualX/obfstr
 
-Expansion sizes measured in this session (`cargo-expand 1.0.126`, semantically identical 64-byte programs, in expanded-source characters); runtimes quoted from the repo's existing dyntest logs (1024-byte input, dev profile).
+Expansion sizes measured in this session (`cargo-expand 1.0.126`, in expanded-source characters; 64-byte semantically identical programs for strings / bytes, single-macro programs with 8-byte same-magnitude payloads for integers / floats); runtimes quoted from the repo's existing dyntest logs (1024-byte input, dev profile). Polymorphism makes every expansion differ in size; figures below are three-sample orders of magnitude.
 
 | Scenario | obfstr2 (`s2!` / `b2!`) | CasualX/obfstr | Ratio |
 | :--- | :--- | :--- | :--- |
 | String expansion size | 20520 | 3304 | ~6.2× |
 | Bytes expansion size | 16999 | 2803 | ~6.1× |
+| Integer expansion size (`i2!`) | ~5k–10k | — (no counterpart) | — |
+| Float expansion size (`fl2!`) | ~7k–13k | — (no counterpart) | — |
 | String runtime cost | `s1` 0.79ms / `s2` 2.2ms / `s3` 3.4ms | ~0.6ms | ~1.3–5× |
 | Bytes runtime cost | `b1` 0.73ms / `b2` 2.7ms / `b3` 4.2ms | ~0.67ms | ~1.1–6× |
 
 | Dimension | obfstr2 | CasualX/obfstr |
 | :--- | :--- | :--- |
+| Type coverage | Strings / bytes / files / integers / floats / format strings (`s/b/f/i/fl/s_fmt`) | Mostly strings |
+| Format strings | `s_fmt!`: literal chunks obfuscated one by one, then `format!`; returns `String` | — (no counterpart) |
 | Expansion form | Different on every build (random chunking / stacked primitives / multiple storage forms / junk code) | Fixed single form |
-| Return value | Owned containers, can be `let`-bound and passed around | Reference borrowing a temporary; `let` binding triggers E0716, inline use only |
-| Plaintext lifetime | Automatically volatile-erased on `Drop` | No erasure |
-| Size / speed | ~6× size, several times the cost | Tiny and fast |
+| Return value | Owned containers, can be `let`-bound and passed around (plain values for `i/fl`) | Reference borrowing a temporary; `let` binding triggers E0716, inline use only |
+| Plaintext lifetime | `s/b/f` containers volatile-erased on `Drop` (no erasure for `i/fl`, `s_fmt!`) | No erasure |
+| Size / speed | Strings / bytes several times the size and cost; integers / floats same order (single chunk) | Tiny and fast |
 
-Reading: the extra size and time buy batch-recovery cost — a fixed form can be killed by one script, while polymorphism changes the signature on every build.
+Reading: the extra size and time buy batch-recovery cost — a fixed form can be killed by one script, while polymorphism changes the signature on every build. For small payloads (integers / floats are always a single chunk) the bloat comes mostly from the fixed decryption shell and interference code, with the payload itself only a small part.
 
 ## Security
 
