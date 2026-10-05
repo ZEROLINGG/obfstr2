@@ -1,6 +1,6 @@
 [package]
 name = "obfstr2"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"
@@ -14,7 +14,7 @@ categories = ["no-std", "embedded"]
 
 [dependencies]
 obfstr2-macros = { version = "0.1", path = "obfstr2-macros" }
-lib-unknown = { version = "0.1", default-features = false, features = ["crypto", "types"] }
+lib-unknown = { version = "0.1.5", default-features = false, features = ["crypto", "types"] }
 
 
 [features]
@@ -24,4 +24,4 @@ default = [
 ]
 
 [dev-dependencies]
-lib-unknown = { version = "0.1", features = ["dyntest", "std"] }
+lib-unknown = { version = "0.1.5", features = ["dyntest", "std"] }

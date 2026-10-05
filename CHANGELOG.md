@@ -16,7 +16,23 @@
 -
 
 ### 变更 (Changed)
-- README 综合描述同步 `i/fl/s_fmt` 新能力：简介段加六类输入总览与裸值无擦除例外，CasualX 对比维度表加类型覆盖 / 格式化行并修正返回值与明文生命周期泛化，场景表加 `i2!` / `fl2!` 实测展开体积行（8 字节载荷单宏程序三轮采样：整数约 5k~10k、浮点约 7k~13k 字符）；中英同步，`i18n-sync-anchor` 已刷新
+-
+
+### 修复 (Fixed)
+-
+
+---
+
+## [0.1.6] - 2026-10-05
+
+### 新增 (Added)
+- `tests/perf.rs` 性能对比测试（报告-only，默认忽略）：明文基线 vs CasualX `obfbytes!` vs `b1/b2/b3` 的四维数据——编译耗时 / 运行耗时（128B 载荷、guest 内 200 次循环放大）+ `cargo expand` 字符数（`DnyRun::cargo`）+ 未 strip 产物体积（`DnyRun::bin_path`），release profile，只断言正确性，数字只展示；跑法见 README 贡献章节
+
+### 变更 (Changed)
+- README 综合描述同步 `i/fl/s_fmt` 新能力（六类输入总览、裸值无擦除例外、CasualX 差异点）；中英同步
+- 依赖升级至 `lib-unknown 0.1.5`（双 crate 一致；`tests/perf.rs` 用到其新增的 `DnyRun::bin_path` / `DnyRun::cargo` 接口）
+- `obfstr2-macros` 包描述改为英文并注明内部实现、无运行时（请直接依赖 `obfstr2`）
+- README 性能板块精简为 `tests/perf.rs` 单一数据源（128B 载荷 release 四维，单次实测示例；删除既有 dyntest 日志表、expand 对比表、维度表与手工 strip 体积小节，陈旧引用 `76KB` / `30~70×` / 性能对比表同步修正）；中英同步，`i18n-sync-anchor` 已刷新
 
 ### 修复 (Fixed)
 -

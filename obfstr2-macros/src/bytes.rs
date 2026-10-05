@@ -39,7 +39,6 @@ pub fn b3(input: Vec<u8>) -> TokenStream2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn polymorphic_two_expansions_differ() {
         // 多态核心：同一输入两次展开的 Token 流应不同（随机分块/原语/存储/标识符）。
