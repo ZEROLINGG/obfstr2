@@ -14,10 +14,18 @@
 
 ---
 
+## [0.1.9] - 2026-10-08
+
+### Changed
+- 根重导出文档改用可编译 doctest 示例（根 crate 下过程宏可展开，`cargo test --doc` 全量通过；`b` 双形态、`i`/`fl` 多种字面量形状、`cs` 三形态、`s_fmt` 命名参数逐档覆盖）
+- `obfstr2-macros` 侧删除 19 个宏的文档注释（rustdoc 会合并重导出与原始定义的文档，留注释会导致 docs.rs 重复显示；共享片段文件同步删除，用户文档只保留在根重导出上）
+
+---
+
 ## [0.1.8] - 2026-10-08
 
 ### Changed
-- 宏文档单源化：`obfstr2-macros` 侧 19 个宏文档精简为共享片段（`src/internal_macro.md` 经 `include_str!` 引入）加一行测试指向，用户文档搬到 `obfstr2/src/lib.rs` 的逐项重导出上（`ignore` 示例改为纯文字用法说明，`//` 注释消除；`s2/f1/i1/fl1/cs1` 交叉链接改用宏式 `!()` 写法）
+- 宏文档单源化：`obfstr2-macros` 侧 19 个宏不再写文档注释（rustdoc 会合并重导出与原始定义的文档，留注释会导致 docs.rs 重复显示），用户文档只写在 `obfstr2/src/lib.rs` 的逐项重导出上；重导出文档改用可编译 doctest 示例（根 crate 下过程宏可展开，`cargo test --doc` 全量通过；`s2/f1/i1/fl1/cs1` 交叉链接改用宏式 `!()` 写法）
 
 ---
 
@@ -125,7 +133,8 @@
 
 ---
 
-[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.5...v0.1.6

@@ -109,134 +109,96 @@ fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStrea
     build(data).into()
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn s1(input: TokenStream) -> TokenStream {
     expand_str(input, str::s1)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn s2(input: TokenStream) -> TokenStream {
     expand_str(input, str::s2)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn s3(input: TokenStream) -> TokenStream {
     expand_str(input, str::s3)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn b1(input: TokenStream) -> TokenStream {
     expand_bytes(input, bytes::b1)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn b2(input: TokenStream) -> TokenStream {
     expand_bytes(input, bytes::b2)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn b3(input: TokenStream) -> TokenStream {
     expand_bytes(input, bytes::b3)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn f1(input: TokenStream) -> TokenStream {
     expand_file(input, bytes::b1)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn f2(input: TokenStream) -> TokenStream {
     expand_file(input, bytes::b2)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn f3(input: TokenStream) -> TokenStream {
     expand_file(input, bytes::b3)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/s_fmt.rs`。
 #[proc_macro]
 pub fn s_fmt(input: TokenStream) -> TokenStream {
     combine::sfmt(input.into()).into()
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn i1(input: TokenStream) -> TokenStream {
     expand_int(input, int::i1)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn i2(input: TokenStream) -> TokenStream {
     expand_int(input, int::i2)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn i3(input: TokenStream) -> TokenStream {
     expand_int(input, int::i3)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn fl1(input: TokenStream) -> TokenStream {
     expand_float(input, float::fl1)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn fl2(input: TokenStream) -> TokenStream {
     expand_float(input, float::fl2)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn fl3(input: TokenStream) -> TokenStream {
     expand_float(input, float::fl3)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn cs1(input: TokenStream) -> TokenStream {
     expand_cstr(input, cstr::cs1)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn cs2(input: TokenStream) -> TokenStream {
     expand_cstr(input, cstr::cs2)
 }
 
-#[doc = include_str!("internal_macro.md")]
-/// 覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn cs3(input: TokenStream) -> TokenStream {
     expand_cstr(input, cstr::cs3)
