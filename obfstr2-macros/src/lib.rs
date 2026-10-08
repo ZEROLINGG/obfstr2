@@ -1,11 +1,12 @@
-//! `obfstr2` 的过程宏实现 crate：字符串 / 字节 / 文件 / 整数 / 浮点编译期混淆入口。
+//! `obfstr2` 的过程宏实现 crate：字符串 / 字节 / 文件 / 整数 / 浮点 / C 字符串编译期混淆入口。
 //!
-//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!`、`i1~3!`、`fl1~3!`（低延迟 / 均衡 / 高强度三档）与 `s_fmt!`；
+//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!`、`i1~3!`、`fl1~3!`、`cs1~3!`（低延迟 / 均衡 / 高强度三档）与 `s_fmt!`；
 //! 具体行为见各宏文档，通过 `obfstr2` 根 crate 转发（`pub use obfstr2_macros::*`）。
 mod bytes;
 mod combine;
 mod core;
 mod crypto;
+mod cstr;
 mod float;
 mod int;
 mod storage;
@@ -74,6 +75,13 @@ fn expand_float(
 ) -> TokenStream {
     match float::parse_float(input.into()) {
         Ok(parsed) => build(parsed).into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+fn expand_cstr(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
+    match cstr::parse_cstr(input.into()) {
+        Ok(payload) => build(payload).into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
@@ -353,4 +361,55 @@ pub fn fl2(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn fl3(input: TokenStream) -> TokenStream {
     expand_float(input, float::fl3)
+}
+
+/// C 字符串混淆宏（低延迟档，对应 `cs1`）。
+///
+/// 接受字符串字面量 `"..."`、C 字符串字面量 `c"..."` 或字节串字面量
+/// `b"..."`（后者可表达非 UTF-8 载荷；三者语义等价，`b"..."` 不校验 UTF-8）。
+/// 载荷不能包含内部 NUL（宏会追加唯一的结尾 `\0`）。
+/// 展开为求值即得原文的 C 字符串容器表达式（`StackCStr<N>`，`N` 含结尾 `\0`，
+/// 请使用类型推断），可解引用为 `core::ffi::CStr`、`as_ptr()` 直投系统调用，
+/// `Drop` 时自动清零。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（cs1 同理）。
+/// use obfstr2::cs1;
+/// let s = cs1!(c"/bin/sh");
+/// ```
+#[proc_macro]
+pub fn cs1(input: TokenStream) -> TokenStream {
+    expand_cstr(input, cstr::cs1)
+}
+
+/// C 字符串混淆宏（均衡档，对应 `cs2`）。
+///
+/// 输入与展开规则同 [`cs1`](cs1())；返回的具体容器类型（`StackCStr` /
+/// `HeapCStr`）同一宏名下可能随编译变化，请使用类型推断。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`。
+/// use obfstr2::cs2;
+/// let s = cs2!("/bin/sh");
+/// ```
+#[proc_macro]
+pub fn cs2(input: TokenStream) -> TokenStream {
+    expand_cstr(input, cstr::cs2)
+}
+
+/// C 字符串混淆宏（高强度档，对应 `cs3`）。
+///
+/// 输入与展开规则同 [`cs1`](cs1())。
+/// # Examples
+///
+/// ```rust,ignore
+/// // 同 s1：不可 doctest，覆盖见根 crate `tests/smoke.rs`（cs3 同理）。
+/// use obfstr2::cs3;
+/// let s = cs3!(b"/bin/sh");
+/// ```
+#[proc_macro]
+pub fn cs3(input: TokenStream) -> TokenStream {
+    expand_cstr(input, cstr::cs3)
 }

@@ -1,6 +1,6 @@
 [package]
 name = "obfstr2-macros"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"
@@ -19,7 +19,7 @@ syn = { version = "3", features = ["full", "derive", "visit-mut"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 
-lib-unknown = { version = "0.1", default-features = false, features = ["rand", "rand-expand", "crypto", "dyntest", "std"]}
+lib-unknown = { version = "0.1.6", default-features = false, features = ["rand", "rand-expand", "crypto", "dyntest", "std"]}
 
 [features]
 default = [

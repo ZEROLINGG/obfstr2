@@ -1,6 +1,6 @@
 # obfstr2
 
-> **Polymorphic compile-time string/bytes/int/float/file obfuscation**
+> **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation**
 
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
@@ -14,10 +14,10 @@
 
 Polymorphic compile-time string/bytes/int/float/file obfuscation（no_std 兼容）。
 
-与 [CasualX/obfstr](https://github.com/CasualX/obfstr) 同类但路线不同：CasualX 以极小的展开体积实现开箱即用的字符串隐藏；obfstr2 则以约数倍的展开体积换取多形态防御——随机分块、原语随机叠加、多存储形态、垃圾代码干扰，使同一输入每次编译产出不同密文，批量还原脚本无法复用固定模式。覆盖面也不止字符串：`s/b/f` 三系之外，`i1~3!` / `fl1~3!` 覆盖全部整数与浮点字面量（展开为可直接运算的裸值），`s_fmt!` 覆盖格式化字符串（字面量片段逐个混淆后走 `format!`）——六类输入走同一套分块→加密→存储→发射内核。另一关键差异是数据生命周期：obfstr2 的容器类型（`lib-unknown` 提供）在 `Drop` 时自动 volatile 清零，解密出的明文用完即擦，不会残留在栈 / 堆上（`s/b/f` 容器；`i/fl` 返回裸值、`s_fmt!` 返回 `String`，无自动擦除，见宏一览说明）。这就是为什么要有 obfstr2：**更高的逆向成本、更多态的混淆、更宽的类型覆盖、敏感数据生命周期结束自动擦除**。
+与 [CasualX/obfstr](https://github.com/CasualX/obfstr) 同类但路线不同：CasualX 以极小的展开体积实现开箱即用的字符串隐藏；obfstr2 则以约数倍的展开体积换取多形态防御——随机分块、原语随机叠加、多存储形态、垃圾代码干扰，使同一输入每次编译产出不同密文，批量还原脚本无法复用固定模式。覆盖面也不止字符串：`s/b/f` 三系之外，`i1~3!` / `fl1~3!` 覆盖全部整数与浮点字面量（展开为可直接运算的裸值），`cs1~3!` 覆盖 C 字符串（`"..."` / `c"..."` / `b"..."` 三形态等价，`b"..."` 可表达非 UTF-8 载荷，展开为解引用即 `CStr` 的自有容器），`s_fmt!` 覆盖格式化字符串（字面量片段逐个混淆后走 `format!`）——七类输入走同一套分块→加密→存储→发射内核。另一关键差异是数据生命周期：obfstr2 的容器类型（`lib-unknown` 提供）在 `Drop` 时自动 volatile 清零，解密出的明文用完即擦，不会残留在栈 / 堆上（`s/b/f/cs` 容器；`i/fl` 返回裸值、`s_fmt!` 返回 `String`，无自动擦除，见宏一览说明）。这就是为什么要有 obfstr2：**更高的逆向成本、更多态的混淆、更宽的类型覆盖、敏感数据生命周期结束自动擦除**。
 
 - 同：字面量进、表达式出；`no_std` 可用；混淆在编译期完成、运行时仅依赖 `lib-unknown`。
-- 异：CasualX 宏返回借用临时值的引用（`let x = obfstr!(...)` 会触发 E0716，只能内联使用），obfstr2 返回自有容器（`i/fl` 为裸值），可绑定、传递、复用；CasualX 单形态展开，obfstr2 每次编译形态皆不同；CasualX 以字符串为主，obfstr2 另有整数 / 浮点 / 文件 / 格式化四类宏。
+- 异：CasualX 宏返回借用临时值的引用（`let x = obfstr!(...)` 会触发 E0716，只能内联使用），obfstr2 返回自有容器（`i/fl` 为裸值），可绑定、传递、复用；CasualX 单形态展开，obfstr2 每次编译形态皆不同；CasualX 以字符串为主，obfstr2 另有整数 / 浮点 / C 字符串 / 文件 / 格式化五类宏。
 
 
 ## 目录
@@ -65,12 +65,15 @@ obfstr2 = "0.1"
 ```
 
 ```rust
-use obfstr2::{b2, f2, fl2, i2, s2, s_fmt};
+use obfstr2::{b2, cs2, f2, fl2, i2, s2, s_fmt};
 
 fn main() {
     // 字符串：求值即得原文，返回自有容器，可绑定、传递、复用
     let hello = s2!("hello");
     print!("{hello}");
+    // C 字符串：求值即得原文，解引用即 `CStr`，`as_ptr()` 可直投系统调用
+    let sh = cs2!(c"/bin/sh");
+    assert_eq!(&*sh, c"/bin/sh");
     // 字节串 / 字节数组：解引用即得原文 `[u8]`
     let b = b2!(b"abc");
     let c = b2!([0x61, 98, 99]);
@@ -98,13 +101,15 @@ fn main() {
 | `b1!` / `b2!` / `b3!` | `b"..."` 或 `[0x41, 66, ...]`（元素 0..=255） | 低延迟 / 均衡 / 高强度 |
 | `i1!` / `i2!` / `i3!` | `42u8` / `-1` / `0xFFu16` 等整数字面量（空后缀视为 `i32`） | 低延迟 / 均衡 / 高强度 |
 | `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` 等浮点字面量（空后缀视为 `f64`） | 低延迟 / 均衡 / 高强度 |
+| `cs1!` / `cs2!` / `cs3!` | `"..."` / `c"..."` / `b"..."`（`b"..."` 可含非 UTF-8 字节，载荷禁内部 NUL） | 低延迟 / 均衡 / 高强度 |
 | `f1!` / `f2!` / `f3!` | `"path/to/file"` 文件路径字面量 | 低延迟 / 均衡 / 高强度 |
 | `s_fmt!` | `"...{}..."` 格式串 + 参数（2 档） | 字面量片段混淆后走 `format!`，返回 `String`（需 `std` / `alloc`） |
 
 说明：
 
-- 字符串宏展开为 `StackStr<N>` / `HeapStr<N>`，字节与文件宏展开为 `StackBytes<N>` / `HeapBytes<N>`，整数宏展开为对应裸整数值（`u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`u64`/`i64`/`u128`/`i128`/`usize`/`isize`，由字面量后缀决定），浮点宏展开为对应裸浮点值（`f32` / `f64`，由字面量后缀决定）；返回的具体类型可能随编译变化，请使用类型推断，不要写死类型标注。
+- 字符串宏展开为 `StackStr<N>` / `HeapStr<N>`，字节与文件宏展开为 `StackBytes<N>` / `HeapBytes<N>`，C 字符串宏展开为 `StackCStr<N>` / `HeapCStr<N>`（`N` 含结尾 `\0`，`N >= 1`；解引用为 `core::ffi::CStr`，`Drop` 自动清零），整数宏展开为对应裸整数值（`u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`u64`/`i64`/`u128`/`i128`/`usize`/`isize`，由字面量后缀决定），浮点宏展开为对应裸浮点值（`f32` / `f64`，由字面量后缀决定）；返回的具体类型可能随编译变化，请使用类型推断，不要写死类型标注。
 - 整数 / 浮点宏复用同一套字节混淆内核（整数小端编码、浮点按 `to_bits` 小端编码后走分块→加密→存储→发射）：载荷恒为单 chunk，可用存储形态仅 2 种，多态性靠原语叠加与发射形态维持；返回裸值，无 `Drop` 自动清零；`usize` / `isize` 按 64 位语义编码（`u64` / `i64` 中转后 `as` 转换）；浮点仅接受有限常规值（`inf` / `NaN` 一律拒绝），`-0.0` 按位保留符号位，断言请用 `to_bits()` 而非 `==`。
+- C 字符串宏同样复用字节混淆内核：载荷追加结尾 `\0` 后整体混淆，运行时经 `try_from(&mut [u8])` 还原（首 NUL 截断 + 解密源擦除）；三种字面量形态语义等价，非 UTF-8 载荷请用 `b"..."`；载荷含任何内部 NUL 即编译期报错。
 - 每次编译的混淆结果都不同（编译期随机），同一宏名的输出字节流不可复现。
 
 ## 适用场景 vs 不适用场景
@@ -134,7 +139,7 @@ fn main() {
 
 ## 最小 Rust 版本 (MSRV)
 
-MSRV 未在 `Cargo.toml` 声明，在`rustc 1.98.1`测试稳定。
+MSRV 为 `1.98`，已在双 `Cargo.toml` 的 `rust-version` 声明。
 
 ## 性能 (Benchmarks)
 

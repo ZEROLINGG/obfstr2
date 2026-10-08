@@ -1,8 +1,9 @@
-//! 根 crate 冒烟测试：全部 15 个宏的小载荷 roundtrip。
+//! 根 crate 冒烟测试：全部 18 个宏的小载荷 roundtrip。
 //!
 //! 直接调用宏做断言，无需 dyntest 现场建工程，毫秒级。
 //! 大载荷（1024B）与裸机链路见 `nostd.rs`；非法输入见 `compile_fail.rs`。
-use obfstr2::{b1, b2, b3, f1, f2, f3, fl1, fl2, fl3, i1, i2, i3, s1, s2, s3};
+use obfstr2::types::cstr::CStr;
+use obfstr2::{b1, b2, b3, cs1, cs2, cs3, f1, f2, f3, fl1, fl2, fl3, i1, i2, i3, s1, s2, s3};
 
 #[test]
 fn str_all_tiers_roundtrip() {
@@ -128,6 +129,30 @@ fn float_all_tiers_agree() {
     assert_eq!(fl1!(3.15).to_bits(), fl2!(3.15).to_bits());
     assert_eq!(fl2!(3.15).to_bits(), fl3!(3.15).to_bits());
     assert_eq!(fl1!(-0.0f32).to_bits(), fl3!(-0.0f32).to_bits());
+}
+
+#[test]
+fn cstr_all_tiers_roundtrip() {
+    // 三种字面量形态等价；空串 / ASCII / 非 UTF-8 边界
+    assert_eq!(&*cs1!(""), c"");
+    assert_eq!(&*cs1!(c""), c"");
+    assert_eq!(&*cs1!(b""), c"");
+    assert_eq!(&*cs1!("/bin/sh"), c"/bin/sh");
+    assert_eq!(&*cs1!(c"/bin/sh"), c"/bin/sh");
+    assert_eq!(&*cs1!(b"/bin/sh"), c"/bin/sh");
+    assert_eq!(&*cs2!("/bin/sh"), c"/bin/sh");
+    assert_eq!(&*cs3!("/bin/sh"), c"/bin/sh");
+    // as_bytes 不含结尾 NUL；as_bytes_with_nul 含结尾 NUL
+    assert_eq!(cs2!("hello").as_bytes(), b"hello");
+    assert_eq!(cs2!("hi").as_bytes_with_nul(), b"hi\0");
+    // b"..." 可表达非 UTF-8 载荷（CStr 只校验 NUL 语义）
+    assert_eq!(cs2!(b"\xff\xfe").as_bytes(), &[0xFF, 0xFE]);
+    // 三档对同一输入解码一致
+    assert_eq!(&*cs1!("tier-check"), &*cs2!("tier-check"));
+    assert_eq!(&*cs2!("tier-check"), &*cs3!("tier-check"));
+    // Display lossy 与 as_ptr 可用
+    assert_eq!(format!("{}", cs2!("abc")), "abc");
+    assert!(!cs2!("abc").as_ptr().is_null());
 }
 
 #[test]

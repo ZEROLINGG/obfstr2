@@ -111,6 +111,33 @@ fn float_bad_suffix_rejected() {
 }
 
 #[test]
+fn cstr_interior_nul_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _s = obfstr2::cs2!("a\0b"); }"#,
+        "内部 NUL",
+        "cs2-nul",
+    );
+}
+
+#[test]
+fn cstr_byte_str_nul_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let _s = obfstr2::cs2!(b"hi\0"); }"#,
+        "内部 NUL",
+        "cs2-bytenul",
+    );
+}
+
+#[test]
+fn cstr_non_literal_rejected() {
+    assert_compile_fail(
+        r#"fn main() { let e = "x"; let _s = obfstr2::cs2!(e); }"#,
+        "只接受字符串",
+        "cs2-lit",
+    );
+}
+
+#[test]
 fn s_fmt_non_literal_rejected() {
     assert_compile_fail(
         r#"fn main() { let f = "x"; print!("{}", obfstr2::s_fmt!(f)) }"#,

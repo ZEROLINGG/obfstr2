@@ -515,6 +515,17 @@ fn b2_nostd_default_features() {
 }
 
 #[test]
+fn cs1_nostd_no_alloc() {
+    // 128 × 'a' 的 C 字符串，纯栈、无堆、关闭默认特性；
+    // 经 UFCS 取 as_bytes 后 to_vec（bump 分配器兜底），复用字节链路模板。
+    let lit = "a".repeat(128);
+    let call = format!(
+        r#"{{ let s = obfstr2::cs1!(c"{lit}"); obfstr2::types::cstr::CStr::as_bytes(&s).to_vec() }}"#
+    );
+    run_nostd(&call, &obfstr2_dep(true), ('a', 128), "cs1_nostd");
+}
+
+#[test]
 fn i1_nostd_no_alloc() {
     // 0x61616161u32 小端即 4 × 'a'，纯栈、无堆、关闭默认特性
     run_nostd_int(
