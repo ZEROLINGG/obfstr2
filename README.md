@@ -12,7 +12,7 @@
 
 **语言：** [English](README_en.md) | 简体中文
 
-Polymorphic compile-time string/bytes/int/float/file obfuscation（no_std 兼容）。
+Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation（no_std 兼容）。
 
 与 [CasualX/obfstr](https://github.com/CasualX/obfstr) 同类但路线不同：CasualX 以极小的展开体积实现开箱即用的字符串隐藏；obfstr2 则以约数倍的展开体积换取多形态防御——随机分块、原语随机叠加、多存储形态、垃圾代码干扰，使同一输入每次编译产出不同密文，批量还原脚本无法复用固定模式。覆盖面也不止字符串：`s/b/f` 三系之外，`i1~3!` / `fl1~3!` 覆盖全部整数与浮点字面量（展开为可直接运算的裸值），`cs1~3!` 覆盖 C 字符串（`"..."` / `c"..."` / `b"..."` 三形态等价，`b"..."` 可表达非 UTF-8 载荷，展开为解引用即 `CStr` 的自有容器），`s_fmt!` 覆盖格式化字符串（字面量片段逐个混淆后走 `format!`）——七类输入走同一套分块→加密→存储→发射内核。另一关键差异是数据生命周期：obfstr2 的容器类型（`lib-unknown` 提供）在 `Drop` 时自动 volatile 清零，解密出的明文用完即擦，不会残留在栈 / 堆上（`s/b/f/cs` 容器；`i/fl` 返回裸值、`s_fmt!` 返回 `String`，无自动擦除，见宏一览说明）。这就是为什么要有 obfstr2：**更高的逆向成本、更多态的混淆、更宽的类型覆盖、敏感数据生命周期结束自动擦除**。
 
@@ -128,6 +128,8 @@ fn main() {
 ## 平台与环境支持
 
 - `no_std` 可用；`Heap*` 类型需启用 `alloc` feature。
+- 支持操作系统：无平台相关代码（纯 Rust，主流桌面系统均可；裸机链路在 `x86_64-unknown-none` 上验证，见贡献章节）。
+- Unsafe 代码：展开代码含 `unwrap_unchecked`（长度不变量已在展开期验证，运行时无校验开销）；容器 `Drop` 经 volatile 写清零明文。
 - `fN!` 读取的文件需在编译时存在（路径相对被编译 crate 的 manifest 目录）。
 
 ## 特性标志 (Feature Flags)
@@ -136,6 +138,13 @@ fn main() {
 | :--- | :--- | :--- |
 | `default` | ✅ | `lib-unknown/alloc` + `obfstr2-macros/alloc`，开启 `Heap*` 堆内存类型 |
 | `alloc`（各 crate 独立） | ❌ | 关闭时仅 `Stack*` 可用（纯栈、无堆，`no_std` 裸机可用） |
+
+如需禁用默认特性（纯栈、无堆）：
+
+```toml
+[dependencies]
+obfstr2 = { version = "0.1", default-features = false }
+```
 
 ## 最小 Rust 版本 (MSRV)
 

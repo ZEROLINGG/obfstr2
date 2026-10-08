@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 58d1fb6b66e3b4e2542172fbf02fb93b4f36243af6ff3fd704c322d5596bad5b (source: README.md) -->
+<!-- i18n-sync-anchor: d9b67ba973db3c15487821ef7428b4981ea9863e72ee4584ed592af2787605ed (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
 
@@ -13,7 +13,7 @@
 
 **Languages:** [简体中文](README.md) | English
 
-A polymorphic compile-time string/bytes/int/float/file obfuscation (`no_std` compatible).
+A polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible).
 
 Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a different trade-off: CasualX delivers out-of-the-box string hiding with minimal expansion size, while obfstr2 trades several times the expansion size for polymorphic defense — random chunking, randomly stacked primitives, multiple alternative storage forms, and junk-code interference — so the same input produces different ciphertext on every compilation, and batch recovery scripts cannot reuse a fixed pattern. Coverage goes beyond strings: on top of the `s/b/f` families, `i1~3!` / `fl1~3!` cover all integer and float literals (expanding to directly usable plain values), `cs1~3!` cover C strings (`"..."` / `c"..."` / `b"..."`, all three forms equivalent, `b"..."` can express non-UTF-8 payloads; expanding to owned containers that dereference to `CStr`), and `s_fmt!` covers format strings (literal chunks obfuscated one by one, then passed to `format!`) — seven input kinds through the same chunk → encrypt → store → emit kernel. Another key difference is data lifetime: obfstr2's container types (provided by `lib-unknown`) are automatically volatile-zeroed on `Drop`, so decrypted plaintext is wiped as soon as it is used instead of lingering on the stack / heap (`s/b/f/cs` containers; `i/fl` return plain values and `s_fmt!` returns `String`, with no automatic erasure — see the macro overview). That is why obfstr2 exists: **higher reverse-engineering cost, more polymorphic obfuscation, wider type coverage, and automatic erasure of sensitive data at the end of its lifetime**.
 
@@ -134,6 +134,8 @@ Notes:
 ## Platform Support
 
 - `no_std` compatible; `Heap*` types require the `alloc` feature.
+- Supported OS: no platform-specific code (pure Rust, works on mainstream desktop systems; the bare-metal link is verified on `x86_64-unknown-none`, see Contributing).
+- Unsafe code: expanded code contains `unwrap_unchecked` (length invariants verified at expansion time, zero runtime check overhead); containers wipe plaintext via volatile writes on `Drop`.
 - Files read by `fN!` must exist at compile time (paths relative to the compiled crate's manifest directory).
 
 ## Feature Flags
@@ -142,6 +144,13 @@ Notes:
 | :--- | :--- | :--- |
 | `default` | ✅ | `lib-unknown/alloc` + `obfstr2-macros/alloc`, enables `Heap*` heap types |
 | `alloc` (per crate) | ❌ | With it off, only `Stack*` is available (pure stack, no heap, bare-metal `no_std` ready) |
+
+To disable default features (pure stack, no heap):
+
+```toml
+[dependencies]
+obfstr2 = { version = "0.1", default-features = false }
+```
 
 ## Minimum Rust Version (MSRV)
 
