@@ -14,6 +14,13 @@
 
 ---
 
+## [0.1.8] - 2026-10-08
+
+### Changed
+- 宏文档单源化：`obfstr2-macros` 侧 19 个宏文档精简为共享片段（`src/internal_macro.md` 经 `include_str!` 引入）加一行测试指向，用户文档搬到 `obfstr2/src/lib.rs` 的逐项重导出上（`ignore` 示例改为纯文字用法说明，`//` 注释消除；`s2/f1/i1/fl1/cs1` 交叉链接改用宏式 `!()` 写法）
+
+---
+
 ## [0.1.7] - 2026-10-08
 
 ### Added
@@ -118,7 +125,8 @@
 
 ---
 
-[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.4...v0.1.5

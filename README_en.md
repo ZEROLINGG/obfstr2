@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: d9b67ba973db3c15487821ef7428b4981ea9863e72ee4584ed592af2787605ed (source: README.md) -->
+<!-- i18n-sync-anchor: 87a744ec37fff5716730eb4f3d6b2e00fb3fc758677b087d8ebb7dc458eec819 (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
 
@@ -184,7 +184,7 @@ Issues and Pull Requests are welcome!
   - `cargo test --test nostd`: `x86_64-unknown-none` bare-metal link (`b1` pure-stack without allocator + `b2` with heap; install that target first);
   - `cargo test --test perf -- --ignored --nocapture`: benchmark report (plaintext baseline vs CasualX vs `b1/b2/b3`; build/run time, expanded chars, binary size; report-only, needs network for `obfstr` plus `cargo-expand`);
   - `cd obfstr2-macros && cargo test --lib`: pure unit tests (format-string splitting, polymorphic expansion, milliseconds).
-- Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries (in `obfstr2-macros/src/crypto.rs` and `storage.rs` respectively) and leave the orchestration layer (`core.rs::build_obfuscated_bytes`) untouched.
+- Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries (in `obfstr2-macros/src/crypto.rs` and `storage.rs` respectively) and leave the orchestration layer (`core.rs::build_obfuscated_bytes`) untouched; new macros need a re-export plus user docs in `obfstr2/src/lib.rs`, with only a one-line pointer left on the `obfstr2-macros` side.
 
 ## Changelog
 

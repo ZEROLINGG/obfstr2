@@ -177,7 +177,7 @@ MSRV 为 `1.98`，已在双 `Cargo.toml` 的 `rust-version` 声明。
   - `cargo test --test nostd`：`x86_64-unknown-none` 裸机链路（`b1` 纯栈无分配 + `b2` 含堆，需安装该 target）；
   - `cargo test --test perf -- --ignored --nocapture`：性能对比报告（明文基线 vs CasualX vs `b1/b2/b3`，编译耗时 / 运行耗时 / expand 字符数 / 产物体积，只展示不断言，需联网拉取 `obfstr` 并安装 `cargo-expand`）；
   - `cd obfstr2-macros && cargo test --lib`：纯单元测试（格式串切分、多态展开，毫秒级）。
-- 提交 PR 前请先阅读[设计哲学](#设计哲学-design-philosophy)：新增混淆原语请以 `Crypto` / `Storage` 表项形式接入（分别位于 `obfstr2-macros/src/crypto.rs` 与 `storage.rs`），编排层（`core.rs::build_obfuscated_bytes`）保持不动。
+- 提交 PR 前请先阅读[设计哲学](#设计哲学-design-philosophy)：新增混淆原语请以 `Crypto` / `Storage` 表项形式接入（分别位于 `obfstr2-macros/src/crypto.rs` 与 `storage.rs`），编排层（`core.rs::build_obfuscated_bytes`）保持不动；新增宏需在 `obfstr2/src/lib.rs` 加重导出 + 用户文档，`obfstr2-macros` 侧只留一句话指针。
 
 ## 变更日志 (Changelog)
 
