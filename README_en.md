@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 568d87c0c98aa81cd2485b5a79d803b6506539310570266a02bac83fa9ba0b99 (source: README.md) -->
+<!-- i18n-sync-anchor: 7f7e0daf8c638e7cf79fc1373f7945f0b30ca9093459ad7273d71a22f8710b70 (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
 
@@ -48,7 +48,7 @@ Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a diffe
 
 | We chose | Instead of | Why |
 | :--- | :--- | :--- |
-| Compile time and size for strength | Minimal runtime decryption overhead | A 128B input expands to ~55k characters and a ~490KB binary under `b3` (see Benchmarks); runtime is just linear decryption |
+| Compile time and size for strength | Minimal runtime decryption overhead | A 128B input expands to ~57k characters and a ~485KB binary under `b3` (see Benchmarks); runtime is just linear decryption |
 | Different output on every build | Reproducible builds | Polymorphism is the core defense; identical artifact hashes are impossible by design |
 | Effectiveness-oriented obfuscation | Cryptographic security claims | The goal is raising batch-script recovery cost, not resisting targeted manual reverse engineering |
 
@@ -158,15 +158,34 @@ MSRV is `1.98`, declared via `rust-version` in both `Cargo.toml` files.
 
 ## Benchmarks
 
-The sole source of the figures below is `tests/perf.rs` (re-runnable via `cargo test --test perf -- --ignored --nocapture`; report-only, figures shown but never asserted): semantically identical single-macro programs with a 128B all-`a` payload, release cold builds, 200 decryption rounds per guest for checksum verification (run time includes process startup). Polymorphism makes every run differ; the table is a single measured sample, order-of-magnitude reference only.
+The sole source of the figures below is `tests/perf.rs` (re-runnable via `cargo test --test perf -- --ignored --nocapture`; report-only, figures shown but never asserted). Polymorphism makes every run differ; the table is a single measured sample, order-of-magnitude reference only.
 
-| Program                                 | Build time | Run time | Expanded chars | Binary (unstripped) |
-|:----------------------------------------|:-----------|:---------|:---------------|:--------------------|
-| Plaintext baseline (`static` reference) | ~0.1s      | ~11ms    | ~0.5k          | ~447KB              |
-| CasualX/obfstr 0.4                      | ~1.1s      | ~11ms    | ~2.8k          | ~449KB              |
-| obfstr2 (`b1!`)                         | ~2.2s      | ~11ms    | ~31k           | ~458KB              |
-| obfstr2 (`b2!`)                         | ~2.8s      | ~11ms    | ~47k           | ~470KB              |
-| obfstr2 (`b3!`)                         | ~2.4s      | ~20ms    | ~55k           | ~490KB              |
+Test parameters:
+
+| Parameter | Value | Notes |
+|:---|:---|:---|
+| `PAYLOAD_LEN` | 128 | Payload size in bytes, all `a` (aligned with `nostd.rs`) |
+| `LOOPS` | 2000 | "Decrypt + checksum" rounds per guest |
+| `REPEATS` | 3 | Repetitions per case, median taken |
+| profile | release | Cold builds (including temp-project dependency compilation) |
+| `EXPECTED_SUM` | 24832000 | Checksum assertion value (`128 × 97 × 2000`), correctness gate |
+
+| Program                                 | Per-decryption cost | Build time | Run time (2000 decryption rounds, incl. startup) | Expanded chars | Binary (unstripped) |
+|:----------------------------------------|:--------------------|:-----------|:---------|:---------------|:--------------------|
+| Plaintext baseline (`static` reference) | — | 154.26ms   | 10.33ms | 519 | 444920 |
+| CasualX/obfstr 0.4                      | 0.07µs | 1.70s (1000%) | 10.46ms (1%) | 3279 (532%) | 447704 (1%) |
+| obfstr2 (`b1!`)                         | -0.00µs | 4.14s (2584%) | 10.32ms (-0%) | 19153 (3590%) | 458224 (3%) |
+| obfstr2 (`b2!`)                         | 20.15µs | 4.05s (2525%) | 50.62ms (390%) | 33721 (6397%) | 475576 (7%) |
+| obfstr2 (`b3!`)                         | 90.70µs | 4.65s (2912%) | 191.73ms (1757%) | 56987 (10880%) | 495704 (11%) |
+
+Parameter notes:
+
+- Per-decryption cost: `(row time − baseline time) / 2000`, in µs; assumes identical startup cost across rows, cancelled out by differencing; the baseline row shows `—`; rows indistinguishable from baseline come out ≈0 or negative, which is noise, shown as-is.
+- Build time: only cross-row differences reflect macro-expansion marginal cost, and percentages are diluted by the fixed cost — order of magnitude only.
+- Run time: includes process startup and container `Drop` wiping; every loop body carries a `black_box` (the `CasualX` row pins the decrypted value) so the compiler cannot hoist loop-invariant decryption out of the loop.
+- Expanded chars: `cargo expand` output length, including ~0.5k of boilerplate.
+- Binary: unstripped `fs::metadata` size at `DnyRun::bin_path()`, shown last.
+- Parentheses: increase over the plaintext baseline in percent (baseline is the 0% origin); `-0%` is an integer-rounding artifact meaning marginally below baseline.
 
 
 ## Security
@@ -184,7 +203,7 @@ Issues and Pull Requests are welcome!
   - `cargo test --test nostd`: `x86_64-unknown-none` bare-metal link (`b1` pure-stack without allocator + `b2` with heap; install that target first);
   - `cargo test --test perf -- --ignored --nocapture`: benchmark report (plaintext baseline vs CasualX vs `b1/b2/b3`; build/run time, expanded chars, binary size; report-only, needs network for `obfstr` plus `cargo-expand`);
   - `cd obfstr2-macros && cargo test --lib`: pure unit tests (format-string splitting, polymorphic expansion, milliseconds).
-- Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries (in `obfstr2-macros/src/crypto.rs` and `storage.rs` respectively) and leave the orchestration layer (`core.rs::build_obfuscated_bytes`) untouched; new macros need a re-export plus user docs in `obfstr2/src/lib.rs`, with no doc comments on the `obfstr2-macros` side (rustdoc merges both into one page, causing duplication).
+- Before submitting a PR, read the [Design Philosophy](#design-philosophy): new obfuscation primitives must plug in as `Crypto` / `Storage` table entries (in `obfstr2-macros/src/crypto.rs` and `storage.rs` respectively) and leave the orchestration layer (`core.rs::build_obfuscated_bytes`) untouched; new macros need a single-layer `macro_rules` wrapper plus user docs in `obfstr2/src/lib.rs` (forwarding via the absolute `::obfstr2::obfstr2_macros::*` path), with explanatory docs plus a `# Warning` section on the `obfstr2-macros` side (rustdoc keeps wrapper and internal docs separate, no dedup workaround needed).
 
 ## Changelog
 

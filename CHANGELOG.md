@@ -12,6 +12,15 @@
 
 ## [Unreleased]
 
+### Changed
+- 根 crate 19 个宏由 `pub use` 重导出改为单层 `macro_rules` 包装（直调 `::obfstr2::obfstr2_macros::*` 绝对路径，对外调用形式不变）：包装器自带文档，内部文档不再合并渲染，docs.rs 只显示用户文档；新增 `#[doc(hidden)] pub extern crate obfstr2_macros` 仅供路径解析
+- `obfstr2-macros` 侧 19 个宏补回解释文档并加 `# Warning`（内部实现、不做稳定性承诺，指向根 crate 文档与测试）
+- 内部重构（零行为变更，下一条除外）：档位魔法数字收敛为 `core.rs` 的 `TIER_LOW/BALANCED/HIGH` 表（`build_obfuscated_bytes` 改接 `TierParams`），`s2`/`cs2`/`i2`/`fl2`/`b2` 的堆栈二选一收敛为 `want_heap()`，`int` 解码/解析 12 臂与 `float` 四函数双臂改 `macro_rules!` 生成（不引入新依赖），`u64`/`u128` 存储策略合并为带参表项
+- `b3` 主容器随 `alloc` 走堆（与 `s3`/`cs3`/`i3`/`fl3` 对齐；关闭 `alloc` 时仍纯栈，`no_std` 行为不变）
+- 内部重构（零行为变更）：输入解析归拢为 `parse.rs`（`parse_int`/`parse_float`/`parse_cstr`/`parse_str`/`parse_bytes`/`parse_file` 及 `Parsed*` 类型，`int`/`float` 顶层经 `split_neg` 共享负号拆分，错误文案不变），档位适配五文件移入 `types/` 子目录（`mod.rs` 外观转发）
+- 垃圾块填充概率参数化：`TierParams` 新增 `junk_pct`（0~100 百分比，按 chunk 掷骰），低 / 均衡 / 高三档分别取 5 / 20 / 40（原全档 10%）；只影响展开体积与垃圾密度，解码正确性不变
+- `tests/perf.rs` 报告新增相对明文基线的增幅百分比（括号内，基线自身为 `0%`；基线为零或数据缺失时回落为纯数字）与每次去混淆耗时列（`（行耗时 − 基线耗时）/ 2000`，基线行记 `—`，负值原样显示），附 `pct`/`cell` 单测；循环 200→2000，每用例 3 次取中位数；`CasualX` 行补 `black_box`（外层求和与解密值双钉，与基线口径拉平，防解密被外提）
+
 ---
 
 ## [0.1.9] - 2026-10-08
