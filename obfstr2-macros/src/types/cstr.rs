@@ -1,7 +1,7 @@
 //! C 字符串档位入口：`cs1` / `cs2` / `cs3`（低延迟 / 均衡 / 高强度）。
 //!
 //! 注册表见 `crate::crypto` / `crate::storage`，编排见 `crate::core`，
-//! 本文件只保留 C 字符串解析、NUL 语义与档位参数。
+//! 本文件只保留 C 字符串 NUL 语义与档位入口；解析见 `crate::parse`。
 //!
 //! 设计：字面量载荷（不含 `\0`，编译期拒绝任何内部 NUL）追加结尾 `\0` 后
 //! 喂入 `build_obfuscated_bytes`（经 `b1`/`b2`/`b3` 档位入口），运行时解密为
@@ -11,45 +11,9 @@
 //! `N` 含结尾 `\0`（`N >= 1`，空串即 `N = 1`）；返回自有容器，`Drop` 自动清零。
 //! 非 UTF-8 载荷请用 `b"..."` 形态（`CStr` 只校验 NUL 语义，不校验 UTF-8）。
 
-use crate::bytes::{b1, b2, b3};
-use lib_unknown::rand::random;
+use super::{b1, b2, b3, want_heap};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-
-/// 解析 `csN!` 输入：只接受 `"..."` / `c"..."` / `b"..."` 字面量，拒绝表达式/路径/函数调用。
-///
-/// 返回不含结尾 `\0` 的载荷字节；载荷中任何位置出现 NUL 即报错并给出下标
-/// （宏会追加唯一的结尾 NUL，故任何输入 NUL 都是内部 NUL）。
-pub(crate) fn parse_cstr(input: TokenStream2) -> syn::Result<Vec<u8>> {
-    let expr: syn::Expr = syn::parse2(input)?;
-    let (payload, span) = match expr {
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Str(lit),
-            ..
-        }) => (lit.value().into_bytes(), lit.span()),
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::CStr(lit),
-            ..
-        }) => (lit.value().as_bytes().to_vec(), lit.span()),
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::ByteStr(lit),
-            ..
-        }) => (lit.value(), lit.span()),
-        other => {
-            return Err(syn::Error::new_spanned(
-                &other,
-                "csN! 只接受字符串/C 字符串/字节串字面量（如 \"hi\"、c\"hi\"、b\"hi\"），不支持表达式",
-            ));
-        }
-    };
-    if let Some(pos) = payload.iter().position(|&b| b == 0) {
-        return Err(syn::Error::new(
-            span,
-            format!("C 字符串载荷不能包含内部 NUL（载荷下标 {pos}）"),
-        ));
-    }
-    Ok(payload)
-}
 
 /// 载荷追加结尾 `\0`（调用方已保证载荷无内部 NUL，追加后恰为合法 C 串字节）。
 fn with_nul(mut payload: Vec<u8>) -> Vec<u8> {
@@ -74,7 +38,7 @@ pub fn cs2(payload: Vec<u8>) -> TokenStream2 {
     let size = payload.len() + 1;
     let ts = b2(with_nul(payload));
 
-    let main_type_path = if cfg!(feature = "alloc") && random() {
+    let main_type_path = if want_heap() {
         quote!(::obfstr2::types::cstr::HeapCStr)
     } else {
         quote!(::obfstr2::types::cstr::StackCStr)
@@ -109,6 +73,7 @@ pub fn cs3(payload: Vec<u8>) -> TokenStream2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parse::parse_cstr;
 
     fn token(s: &str) -> TokenStream2 {
         match s.parse() {

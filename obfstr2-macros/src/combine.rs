@@ -161,7 +161,7 @@ pub fn sfmt(input: TokenStream2) -> TokenStream2 {
                 let arg_name = quote::format_ident!("__s_fmt_chunk_{}_{}__", obf_idx, suffix);
                 new_fmt.push_str(&format!("{{{arg_name}}}"));
 
-                let ts = crate::str::s2(unescaped_text);
+                let ts = crate::types::s2(unescaped_text);
                 obf_injections.push(quote! { #arg_name = #ts });
 
                 obf_idx += 1;

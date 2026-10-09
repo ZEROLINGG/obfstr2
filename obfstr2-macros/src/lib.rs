@@ -1,69 +1,38 @@
 //! `obfstr2` 的内部过程宏实现 crate，无运行时，不可 doctest。
 //!
-//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!`、`i1~3!`、`fl1~3!`、`cs1~3!`（低延迟 / 均衡 / 高强度三档）与 `s_fmt!` 的过程宏本体；
-//! 用户文档见 `obfstr2` 根 crate 的同名重导出，请直接依赖 `obfstr2`。
-mod bytes;
+//! 对外暴露 `s1~3!`、`b1~3!`、`f1~3!`、`i1~3!`、`fl1~3!`、`cs1~3!`（低延迟 / 均衡 / 高强度三档）与 `s_fmt!` 的过程宏本体。
+//!
+//! # Warning
+//!
+//! 本 crate 文档仅面向实现者，用户请直接依赖 `obfstr2`，使用根 crate 同名宏（`macro_rules` 包装）并以其文档与可运行示例为准。
 mod combine;
 mod core;
 mod crypto;
-mod cstr;
-mod float;
-mod int;
+mod parse;
 mod storage;
-mod str;
+mod types;
 
 use proc_macro::TokenStream;
 
 fn expand_str(input: TokenStream, build: fn(String) -> proc_macro2::TokenStream) -> TokenStream {
-    match syn::parse::<syn::LitStr>(input) {
-        Ok(lit) => build(lit.value()).into(),
+    match parse::parse_str(input.into()) {
+        Ok(s) => build(s).into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
 
 fn expand_bytes(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
-    // 1. b"..." 字节串形式
-    if let Ok(lit) = syn::parse::<syn::LitByteStr>(input.clone()) {
-        return build(lit.value()).into();
-    }
-    // 2. [0x41, 66, ...] 字节数组形式（元素必须为 0..=255 的整数字面量）
-    match syn::parse::<syn::ExprArray>(input) {
-        Ok(arr) => {
-            let mut bytes = Vec::with_capacity(arr.elems.len());
-            for elem in &arr.elems {
-                match elem {
-                    syn::Expr::Lit(syn::ExprLit {
-                        lit: syn::Lit::Int(n),
-                        ..
-                    }) => match n.base10_parse::<u8>() {
-                        Ok(b) => bytes.push(b),
-                        Err(_) => {
-                            return syn::Error::new_spanned(n, "字节数组元素必须在 0..=255 范围内")
-                                .to_compile_error()
-                                .into();
-                        }
-                    },
-                    other => {
-                        return syn::Error::new_spanned(
-                            other,
-                            "字节数组只接受 0..=255 的整数字面量",
-                        )
-                        .to_compile_error()
-                        .into();
-                    }
-                }
-            }
-            build(bytes).into()
-        }
+    match parse::parse_bytes(input.into()) {
+        Ok(bytes) => build(bytes).into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
 
 fn expand_int(
     input: TokenStream,
-    build: fn(int::ParsedInt) -> proc_macro2::TokenStream,
+    build: fn(parse::ParsedInt) -> proc_macro2::TokenStream,
 ) -> TokenStream {
-    match int::parse_int(input.into()) {
+    match parse::parse_int(input.into()) {
         Ok(parsed) => build(parsed).into(),
         Err(e) => e.to_compile_error().into(),
     }
@@ -71,135 +40,238 @@ fn expand_int(
 
 fn expand_float(
     input: TokenStream,
-    build: fn(float::ParsedFloat) -> proc_macro2::TokenStream,
+    build: fn(parse::ParsedFloat) -> proc_macro2::TokenStream,
 ) -> TokenStream {
-    match float::parse_float(input.into()) {
+    match parse::parse_float(input.into()) {
         Ok(parsed) => build(parsed).into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
 
 fn expand_cstr(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
-    match cstr::parse_cstr(input.into()) {
+    match parse::parse_cstr(input.into()) {
         Ok(payload) => build(payload).into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
 
 fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
-    let path_lit = match syn::parse::<syn::LitStr>(input) {
-        Ok(lit) => lit,
-        Err(e) => return e.to_compile_error().into(),
-    };
-    // 路径相对于被编译 crate 的 CARGO_MANIFEST_DIR 解析（与 include_bytes! 一致）
-    let rel = path_lit.value();
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let full = std::path::Path::new(&manifest_dir).join(&rel);
-    let data = match std::fs::read(&full) {
-        Ok(d) => d,
-        Err(e) => {
-            return syn::Error::new(
-                path_lit.span(),
-                format!("无法读取文件 {}: {e}", full.display()),
-            )
-            .to_compile_error()
-            .into();
-        }
-    };
-    build(data).into()
+    match parse::parse_file(input.into()) {
+        Ok(data) => build(data).into(),
+        Err(e) => e.to_compile_error().into(),
+    }
 }
-
+/// 字符串混淆宏本体（低延迟档）：只接受字符串字面量 `"..."`，展开为求值即得原文的表达式。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn s1(input: TokenStream) -> TokenStream {
-    expand_str(input, str::s1)
+    expand_str(input, types::s1)
 }
 
+/// 字符串混淆宏本体（均衡档）：只接受字符串字面量 `"..."`；返回的具体字符串类型（`StackStr` /
+/// `HeapStr`）同一宏名下可能随编译变化。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn s2(input: TokenStream) -> TokenStream {
-    expand_str(input, str::s2)
+    expand_str(input, types::s2)
 }
 
+/// 字符串混淆宏本体（高强度档）：只接受字符串字面量 `"..."`，展开类型规则同 `s2`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn s3(input: TokenStream) -> TokenStream {
-    expand_str(input, str::s3)
+    expand_str(input, types::s3)
 }
 
+/// 字节串混淆宏本体（低延迟档）：接受字节串字面量 `b"..."` 或字节数组 `[0x41, 66, ...]`
+/// （元素须为 0..=255 的整数字面量），展开为求值即得原文的字节容器表达式。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn b1(input: TokenStream) -> TokenStream {
-    expand_bytes(input, bytes::b1)
+    expand_bytes(input, types::b1)
 }
 
+/// 字节串混淆宏本体（均衡档）：接受 `b"..."` 或 `[0x41, 66, ...]`（元素须为 0..=255 的整数字面量）。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn b2(input: TokenStream) -> TokenStream {
-    expand_bytes(input, bytes::b2)
+    expand_bytes(input, types::b2)
 }
 
+/// 字节串混淆宏本体（高强度档）：接受 `b"..."` 或 `[0x41, 66, ...]`（元素须为 0..=255 的整数字面量）。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn b3(input: TokenStream) -> TokenStream {
-    expand_bytes(input, bytes::b3)
+    expand_bytes(input, types::b3)
 }
 
+/// 文件混淆宏本体（低延迟档）：接受文件路径字面量（相对于被编译 crate 的
+/// `CARGO_MANIFEST_DIR` 解析），编译期读入文件内容并混淆；文件缺失或不可读时报编译错误。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn f1(input: TokenStream) -> TokenStream {
-    expand_file(input, bytes::b1)
+    expand_file(input, types::b1)
 }
 
+/// 文件混淆宏本体（均衡档）：输入与展开规则同 `f1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn f2(input: TokenStream) -> TokenStream {
-    expand_file(input, bytes::b2)
+    expand_file(input, types::b2)
 }
 
+/// 文件混淆宏本体（高强度档）：输入与展开规则同 `f1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn f3(input: TokenStream) -> TokenStream {
-    expand_file(input, bytes::b3)
+    expand_file(input, types::b3)
 }
 
+/// 格式化字符串混淆宏本体（2 档）：首参须为字符串字面量，其中的字面量片段逐个混淆后注入 `format!` 调用，
+/// 占位符与后续参数原样保留。返回 `String`，需要调用方有 `std` / `alloc`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/s_fmt.rs`。
 #[proc_macro]
 pub fn s_fmt(input: TokenStream) -> TokenStream {
     combine::sfmt(input.into()).into()
 }
 
+/// 整数混淆宏本体（低延迟档）：只接受整数字面量（如 `42u8`、`-1`、`0xFFu16`，空后缀视为 `i32`），
+/// 展开为求值即得原文的裸整数表达式；返回裸值，无 `Drop` 自动清零。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn i1(input: TokenStream) -> TokenStream {
-    expand_int(input, int::i1)
+    expand_int(input, types::i1)
 }
 
+/// 整数混淆宏本体（均衡档）：输入与展开规则同 `i1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn i2(input: TokenStream) -> TokenStream {
-    expand_int(input, int::i2)
+    expand_int(input, types::i2)
 }
 
+/// 整数混淆宏本体（高强度档）：输入与展开规则同 `i1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn i3(input: TokenStream) -> TokenStream {
-    expand_int(input, int::i3)
+    expand_int(input, types::i3)
 }
 
+/// 浮点混淆宏本体（低延迟档）：只接受浮点字面量（如 `3.14f32`、`-1.0`、`1e10`，空后缀视为 `f64`），
+/// 展开为求值即得原文的裸浮点表达式；仅接受有限常规值，`-0.0` 按位保留符号位；返回裸值，无 `Drop` 自动清零。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn fl1(input: TokenStream) -> TokenStream {
-    expand_float(input, float::fl1)
+    expand_float(input, types::fl1)
 }
 
+/// 浮点混淆宏本体（均衡档）：输入与展开规则同 `fl1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn fl2(input: TokenStream) -> TokenStream {
-    expand_float(input, float::fl2)
+    expand_float(input, types::fl2)
 }
 
+/// 浮点混淆宏本体（高强度档）：输入与展开规则同 `fl1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn fl3(input: TokenStream) -> TokenStream {
-    expand_float(input, float::fl3)
+    expand_float(input, types::fl3)
 }
 
+/// C 字符串混淆宏本体（低延迟档）：接受 `"..."` / `c"..."` / `b"..."` 三种字面量（语义等价，
+/// `b"..."` 可表达非 UTF-8 载荷）；载荷禁内部 NUL，宏追加唯一的结尾 `\0`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn cs1(input: TokenStream) -> TokenStream {
-    expand_cstr(input, cstr::cs1)
+    expand_cstr(input, types::cs1)
 }
 
+/// C 字符串混淆宏本体（均衡档）：输入与展开规则同 `cs1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn cs2(input: TokenStream) -> TokenStream {
-    expand_cstr(input, cstr::cs2)
+    expand_cstr(input, types::cs2)
 }
-
+/// C 字符串混淆宏本体（高强度档）：输入与展开规则同 `cs1`。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/smoke.rs`。
 #[proc_macro]
 pub fn cs3(input: TokenStream) -> TokenStream {
-    expand_cstr(input, cstr::cs3)
+    expand_cstr(input, types::cs3)
 }

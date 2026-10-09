@@ -1,5 +1,4 @@
-use crate::bytes::{b1, b2, b3};
-use lib_unknown::rand::random;
+use super::{b1, b2, b3, want_heap};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
@@ -19,7 +18,7 @@ pub fn s2(input: String) -> TokenStream2 {
     let size = input.len();
     let ts = b2(input.into_bytes());
 
-    let main_type_path = if cfg!(feature = "alloc") && random() {
+    let main_type_path = if want_heap() {
         quote!(::obfstr2::types::str::HeapStr)
     } else {
         quote!(::obfstr2::types::str::StackStr)

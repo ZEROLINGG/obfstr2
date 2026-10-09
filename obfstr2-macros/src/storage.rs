@@ -2,7 +2,9 @@
 //!
 
 use lib_unknown::rand::random;
-use proc_macro2::{Ident as Ident2, Literal as Literal2, TokenStream as TokenStream2};
+use proc_macro2::{
+    Ident as Ident2, Literal as Literal2, Span as Span2, TokenStream as TokenStream2,
+};
 use quote::{format_ident, quote};
 use std::sync::LazyLock;
 
@@ -59,6 +61,42 @@ fn hex_str_decode(
     }
 }
 
+/// 整型数组存储策略生成：`u64` / `u128` 双策略仅位宽、字面量后缀与延迟不同，
+/// 共用分块填充与按需截断恢复逻辑。
+macro_rules! int_array_storage {
+    ($tag:ident, $ty:ty, $suffixed:ident, $width:expr, $latency:expr) => {
+        Storage {
+            ast: |ident, type_path, size, data| {
+                let mut ints = Vec::new();
+                for chunk in data.chunks($width) {
+                    let mut buf = [0u8; $width];
+                    buf[..chunk.len()].copy_from_slice(chunk);
+                    ints.push(Literal2::$suffixed(<$ty>::from_le_bytes(buf)));
+                }
+                let const_name = Ident2::new(
+                    &format!("__STATIC_{}_{}", stringify!($tag), random::<u32>()),
+                    Span2::call_site(),
+                );
+                quote! {
+                    static #const_name: &[$ty] = &[#(#ints),*];
+                    let mut #ident = #type_path::new();
+                    let mut _current_len = 0;
+                    for &val in #const_name {
+                        let b = val.to_le_bytes();
+                        let remaining = #size - _current_len;
+                        let copy_len = if remaining > $width { $width } else { remaining };
+                        unsafe { #ident.extend_from_slice(&b[..copy_len]).unwrap_unchecked(); }
+                        _current_len += copy_len;
+                    }
+                }
+            },
+            support: |size| (128..=1024).contains(&size),
+            security: 20,
+            latency: $latency,
+        }
+    };
+}
+
 pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| {
     vec![
         Storage {
@@ -88,58 +126,8 @@ pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| 
             security: 10,
             latency: 5,
         },
-        Storage {
-            ast: |ident, type_path, size, data| {
-                let mut u64s = Vec::new();
-                for chunk in data.chunks(8) {
-                    let mut buf = [0u8; 8];
-                    buf[..chunk.len()].copy_from_slice(chunk);
-                    u64s.push(Literal2::u64_suffixed(u64::from_le_bytes(buf)));
-                }
-                let const_name = format_ident!("__STATIC_U64_{}", random::<u32>());
-                quote! {
-                    static #const_name: &[u64] = &[#(#u64s),*];
-                    let mut #ident = #type_path::new();
-                    let mut _current_len = 0;
-                    for &val in #const_name {
-                        let b = val.to_le_bytes();
-                        let remaining = #size - _current_len;
-                        let copy_len = if remaining > 8 { 8 } else { remaining };
-                        unsafe { #ident.extend_from_slice(&b[..copy_len]).unwrap_unchecked(); }
-                        _current_len += copy_len;
-                    }
-                }
-            },
-            support: |size| (128..=1024).contains(&size),
-            security: 20,
-            latency: 8,
-        },
-        Storage {
-            ast: |ident, type_path, size, data| {
-                let mut u128s = Vec::new();
-                for chunk in data.chunks(16) {
-                    let mut buf = [0u8; 16];
-                    buf[..chunk.len()].copy_from_slice(chunk);
-                    u128s.push(Literal2::u128_suffixed(u128::from_le_bytes(buf)));
-                }
-                let const_name = format_ident!("__STATIC_U128_{}", random::<u32>());
-                quote! {
-                    static #const_name: &[u128] = &[#(#u128s),*];
-                    let mut #ident = #type_path::new();
-                    let mut _current_len = 0;
-                    for &val in #const_name {
-                        let b = val.to_le_bytes();
-                        let remaining = #size - _current_len;
-                        let copy_len = if remaining > 16 { 16 } else { remaining };
-                        unsafe { #ident.extend_from_slice(&b[..copy_len]).unwrap_unchecked(); }
-                        _current_len += copy_len;
-                    }
-                }
-            },
-            support: |size| (128..=1024).contains(&size),
-            security: 20,
-            latency: 10,
-        },
+        int_array_storage!(U64, u64, u64_suffixed, 8, 8),
+        int_array_storage!(U128, u128, u128_suffixed, 16, 10),
         // MAC 地址隐写存储策略
         Storage {
             ast: |ident, type_path, size, data| {

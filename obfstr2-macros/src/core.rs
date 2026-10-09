@@ -80,11 +80,45 @@ fn select_junk_ops(chunk_size: usize, max_latency: u8) -> Vec<Crypto> {
     pool.into_iter().take(n).collect()
 }
 
+/// 强度档位公共参数（延迟上限 / 组合安全度下限 / 原语叠加倍率）。
+///
+/// `allow_heap` / `stack_main_bytes` 与档位正交（`no_std` 可用性与主容器策略），保留在调用点，不进表。
+#[derive(Clone, Copy)]
+pub(crate) struct TierParams {
+    pub(crate) max_latency: u8,
+    pub(crate) min_security: u8,
+    pub(crate) magnification: u8,
+    /// 垃圾块填充概率（0~100，百分比；按 chunk 掷骰；超出 100 视为恒插）。
+    pub(crate) junk_pct: u8,
+}
+
+/// 低延迟档（`s1` / `b1` / `i1` / `fl1` / `cs1`）：纯栈，`no_std` 可用。
+pub(crate) const TIER_LOW: TierParams = TierParams {
+    max_latency: 30,
+    min_security: 0,
+    magnification: 1,
+    junk_pct: 5,
+};
+
+/// 均衡档（`s2` / `b2` / `i2` / `fl2` / `cs2`）：堆栈随机。
+pub(crate) const TIER_BALANCED: TierParams = TierParams {
+    max_latency: 100,
+    min_security: 50,
+    magnification: 2,
+    junk_pct: 20,
+};
+
+/// 高强度档（`s3` / `b3` / `i3` / `fl3` / `cs3`）：`alloc` 下主容器走堆。
+pub(crate) const TIER_HIGH: TierParams = TierParams {
+    max_latency: 100,
+    min_security: 95,
+    magnification: 4,
+    junk_pct: 40,
+};
+
 pub(crate) fn build_obfuscated_bytes(
     mut input: Vec<u8>,
-    max_latency: u8,
-    min_combined_security: u8,
-    magnification: u8,
+    tier: TierParams,
     allow_heap: bool,
     stack_main_bytes: bool,
 ) -> TokenStream2 {
@@ -134,9 +168,9 @@ pub(crate) fn build_obfuscated_bytes(
 
         let ops = select_stacked_ops(
             chunk_size,
-            max_latency,
-            min_combined_security,
-            magnification,
+            tier.max_latency,
+            tier.min_security,
+            tier.magnification,
         );
 
         // 执行加密并叠加
@@ -150,7 +184,7 @@ pub(crate) fn build_obfuscated_bytes(
             dec_call.extend(dec_ts);
         }
 
-        let storage_strategy = pick_storage(chunk_size, max_latency);
+        let storage_strategy = pick_storage(chunk_size, tier.max_latency);
 
         match random_range(0..3) {
             0 => {
@@ -222,14 +256,14 @@ pub(crate) fn build_obfuscated_bytes(
             }
         });
 
-        if random_range(0..10) == 0 {
+        if random_range(0..100_u8) < tier.junk_pct {
             let fake_iv: u8 = random();
             let fake_key: u64 = random();
             let fake_chunk_size = random_range(4..16_usize);
             let mut fake_chunk: Vec<u8> = (0..fake_chunk_size).map(|_| random::<u8>()).collect();
             let fake_bytes_chunk = format_ident!("__chunk_f_{id}_{i}");
 
-            let fake_ops = select_junk_ops(fake_chunk_size, max_latency);
+            let fake_ops = select_junk_ops(fake_chunk_size, tier.max_latency);
 
             for op in &fake_ops {
                 (op.enc)(&mut fake_chunk, fake_key, fake_iv);
@@ -241,7 +275,7 @@ pub(crate) fn build_obfuscated_bytes(
                 fake_dec_call.extend(dec_ts);
             }
 
-            let fake_storage_strategy = pick_fake_storage(fake_chunk_size, max_latency);
+            let fake_storage_strategy = pick_fake_storage(fake_chunk_size, tier.max_latency);
             let fake_chunk_type_expr = quote!(#chunk_type_path::<#fake_chunk_size>);
             let fake_storage_ast = (fake_storage_strategy.ast)(
                 &fake_bytes_chunk,
