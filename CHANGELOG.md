@@ -12,6 +12,28 @@
 
 ## [Unreleased]
 
+### Added
+-
+
+### Changed
+-
+
+### Deprecated
+-
+
+### Removed
+-
+
+### Fixed
+-
+
+### Security
+-
+
+---
+
+## [0.1.10] - 2026-10-09
+
 ### Changed
 - 根 crate 19 个宏由 `pub use` 重导出改为单层 `macro_rules` 包装（直调 `::obfstr2::obfstr2_macros::*` 绝对路径，对外调用形式不变）：包装器自带文档，内部文档不再合并渲染，docs.rs 只显示用户文档；新增 `#[doc(hidden)] pub extern crate obfstr2_macros` 仅供路径解析
 - `obfstr2-macros` 侧 19 个宏补回解释文档并加 `# Warning`（内部实现、不做稳定性承诺，指向根 crate 文档与测试）
@@ -142,7 +164,8 @@
 
 ---
 
-[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.6...v0.1.7

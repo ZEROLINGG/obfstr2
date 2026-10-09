@@ -2,6 +2,7 @@
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation**
 
+[![Type](https://img.shields.io/badge/Project%20Type-Library-green.svg)](#快速开始-quick-start)
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Documentation](https://docs.rs/obfstr2/badge.svg)](https://docs.rs/obfstr2)
@@ -125,13 +126,6 @@ fn main() {
 - 超大文件混淆（展开体积随载荷与档位显著膨胀，见性能）。
 - 需要制品哈希稳定（可复现构建）的发布流程。
 
-## 平台与环境支持
-
-- `no_std` 可用；`Heap*` 类型需启用 `alloc` feature。
-- 支持操作系统：无平台相关代码（纯 Rust，主流桌面系统均可；裸机链路在 `x86_64-unknown-none` 上验证，见贡献章节）。
-- Unsafe 代码：展开代码含 `unwrap_unchecked`（长度不变量已在展开期验证，运行时无校验开销）；容器 `Drop` 经 volatile 写清零明文。
-- `fN!` 读取的文件需在编译时存在（路径相对被编译 crate 的 manifest 目录）。
-
 ## 特性标志 (Feature Flags)
 
 | Feature | 默认启用 | 说明 |
@@ -145,6 +139,13 @@ fn main() {
 [dependencies]
 obfstr2 = { version = "0.1", default-features = false }
 ```
+
+## 平台与环境支持
+
+- `no_std` 可用；`Heap*` 类型需启用 `alloc` feature。
+- 支持操作系统：无平台相关代码（纯 Rust，主流桌面系统均可；裸机链路在 `x86_64-unknown-none` 上验证，见贡献章节）。
+- WebAssembly：`wasm32-unknown-unknown` / `wasm32-wasi` 理论支持但未测试。
+- `fN!` 读取的文件需在编译时存在（路径相对被编译 crate 的 manifest 目录）。
 
 ## 最小 Rust 版本 (MSRV)
 
@@ -184,7 +185,8 @@ MSRV 为 `1.98`，已在双 `Cargo.toml` 的 `rust-version` 声明。
 
 ## 安全性 (Security)
 
-如发现安全漏洞，请直接提交 Issue 说明（本仓库暂无私有上报通道）。
+- Unsafe 代码：展开代码含 `unwrap_unchecked`（长度不变量已在展开期验证，运行时无校验开销）；容器 `Drop` 经 volatile 写清零明文。
+- 如发现安全漏洞，请直接提交 Issue 说明（本仓库暂无私有上报通道）。
 
 ## 贡献 (Contributing)
 

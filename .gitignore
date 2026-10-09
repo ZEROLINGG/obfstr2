@@ -14,10 +14,17 @@ logs/
 !.env.example
 *.pem
 *.key
+*.pfx
 id_rsa
 id_rsa.pub
-*credentials*
-*secret*
+*credentials*.json
+*credentials*.yaml
+*credentials*.yml
+*secret*.json
+*secret*.yaml
+*secret*.yml
+*secret*.txt
+*secret*.bin
 
 # ========== 日志与临时文件 ==========
 *.log

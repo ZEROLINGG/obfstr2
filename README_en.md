@@ -1,8 +1,9 @@
 # obfstr2
-<!-- i18n-sync-anchor: 7f7e0daf8c638e7cf79fc1373f7945f0b30ca9093459ad7273d71a22f8710b70 (source: README.md) -->
+<!-- i18n-sync-anchor: 528136da5682e44770327bf768047d92b03b443f29095a1e37bad2b8e3fae23d (source: README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
 
+[![Type](https://img.shields.io/badge/Project%20Type-Library-green.svg)](#quick-start)
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Documentation](https://docs.rs/obfstr2/badge.svg)](https://docs.rs/obfstr2)
@@ -50,7 +51,7 @@ Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a diffe
 | :--- | :--- | :--- |
 | Compile time and size for strength | Minimal runtime decryption overhead | A 128B input expands to ~57k characters and a ~485KB binary under `b3` (see Benchmarks); runtime is just linear decryption |
 | Different output on every build | Reproducible builds | Polymorphism is the core defense; identical artifact hashes are impossible by design |
-| Effectiveness-oriented obfuscation | Cryptographic security claims | The goal is raising batch-script recovery cost, not resisting targeted manual reverse engineering |
+| Effectiveness-oriented obfuscation | Cryptographic security claims | The goal is raising batch-script recovery cost |
 
 ### Non-Goals
 
@@ -101,15 +102,15 @@ fn main() {
 
 ## Macro Overview
 
-| Macros | Input | Strength tier |
-|---|---|---|
-| `s1!` / `s2!` / `s3!` | `"..."` string literals | Low-latency / Balanced / High-strength |
-| `b1!` / `b2!` / `b3!` | `b"..."` or `[0x41, 66, ...]` (elements must be 0..=255) | Low-latency / Balanced / High-strength |
-| `i1!` / `i2!` / `i3!` | `42u8` / `-1` / `0xFFu16` integer literals (empty suffix means `i32`) | Low-latency / Balanced / High-strength |
-| `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` float literals (empty suffix means `f64`) | Low-latency / Balanced / High-strength |
-| `cs1!` / `cs2!` / `cs3!` | `"..."` / `c"..."` / `b"..."` (`b"..."` may hold non-UTF-8 bytes; payload must not contain interior NUL) | Low-latency / Balanced / High-strength |
-| `f1!` / `f2!` / `f3!` | `"path/to/file"` file path literals | Low-latency / Balanced / High-strength |
-| `s_fmt!` | `"...{}..."` format string + args (tier 2) | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
+| Macros                   | Input                                                                                                    | Strength tier                                                                       |
+|--------------------------|----------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| `s1!` / `s2!` / `s3!`    | `"..."` string literals                                                                                  | Low-latency / Balanced / High-strength                                              |
+| `b1!` / `b2!` / `b3!`    | `b"..."` or `[0x41, 66, ...]` (elements must be 0..=255)                                                 | Low-latency / Balanced / High-strength                                              |
+| `i1!` / `i2!` / `i3!`    | `42u8` / `-1` / `0xFFu16` integer literals (empty suffix means `i32`)                                    | Low-latency / Balanced / High-strength                                              |
+| `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` float literals (empty suffix means `f64`)                                    | Low-latency / Balanced / High-strength                                              |
+| `cs1!` / `cs2!` / `cs3!` | `"..."` / `c"..."` / `b"..."` (`b"..."` may hold non-UTF-8 bytes; payload must not contain interior NUL) | Low-latency / Balanced / High-strength                                              |
+| `f1!` / `f2!` / `f3!`    | `"path/to/file"` file path literals                                                                      | Low-latency / Balanced / High-strength                                              |
+| `s_fmt!`                 | `"...{}..."` format string + args (tier 2)                                                               | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
 
 Notes:
 
@@ -131,13 +132,6 @@ Notes:
 - Obfuscating huge files (expansion grows significantly with payload and tier, see Benchmarks).
 - Release flows requiring stable artifact hashes (reproducible builds).
 
-## Platform Support
-
-- `no_std` compatible; `Heap*` types require the `alloc` feature.
-- Supported OS: no platform-specific code (pure Rust, works on mainstream desktop systems; the bare-metal link is verified on `x86_64-unknown-none`, see Contributing).
-- Unsafe code: expanded code contains `unwrap_unchecked` (length invariants verified at expansion time, zero runtime check overhead); containers wipe plaintext via volatile writes on `Drop`.
-- Files read by `fN!` must exist at compile time (paths relative to the compiled crate's manifest directory).
-
 ## Feature Flags
 
 | Feature | Enabled by default | Description |
@@ -151,6 +145,13 @@ To disable default features (pure stack, no heap):
 [dependencies]
 obfstr2 = { version = "0.1", default-features = false }
 ```
+
+## Platform Support
+
+- `no_std` compatible; `Heap*` types require the `alloc` feature.
+- Supported OS: no platform-specific code (pure Rust, works on mainstream desktop systems; the bare-metal link is verified on `x86_64-unknown-none`, see Contributing).
+- WebAssembly: `wasm32-unknown-unknown` / `wasm32-wasi` theoretically supported but untested.
+- Files read by `fN!` must exist at compile time (paths relative to the compiled crate's manifest directory).
 
 ## Minimum Rust Version (MSRV)
 
@@ -190,6 +191,7 @@ Parameter notes:
 
 ## Security
 
+- Unsafe code: expanded code contains `unwrap_unchecked` (length invariants verified at expansion time, zero runtime check overhead); containers wipe plaintext via volatile writes on `Drop`.
 
 If you find a security vulnerability, please file an Issue directly (this repo has no private reporting channel yet).
 
