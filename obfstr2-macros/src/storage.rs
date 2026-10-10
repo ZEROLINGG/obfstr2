@@ -10,14 +10,11 @@ use std::sync::LazyLock;
 
 #[derive(Clone)]
 pub(crate) struct Storage {
-    // 接受参数： (变量名(Ident), 类型路径(TokenStream2), 密文真实长度(usize), 密文数据(&[u8]))
     // 返回： 完整的变量声明与数据填充 AST
     pub(crate) ast: fn(&proc_macro2::Ident, &TokenStream2, usize, &[u8]) -> TokenStream2,
     // 判断当前 chunk 长度是否适合此策略
     pub(crate) support: fn(usize) -> bool,
     // 抗分析能力（如伪装度，打断静态扫描的能力） 0~100
-    // 当前仅作注册表元数据记录（选择逻辑暂只按 support/latency 过滤，
-    // 预留给后续加权选择），故对 dead_code 单字段豁免。
     #[allow(dead_code)]
     pub(crate) security: u8,
     // 运行时恢复数据的性能开销 0~100
@@ -25,9 +22,6 @@ pub(crate) struct Storage {
 }
 
 /// 十六进制字符串存储（MAC/UUID/IPv6）的运行时解码片段。
-///
-/// 三者此前各有一套近乎逐行重复的 `for &b in s.as_bytes()` 解析循环，
-/// 此处按分隔符（`b':'` / `b'-'`）参数化为公共 helper。
 fn hex_str_decode(
     ident: &Ident2,
     type_path: &TokenStream2,
@@ -64,7 +58,7 @@ fn hex_str_decode(
 /// 整型数组存储策略生成：`u64` / `u128` 双策略仅位宽、字面量后缀与延迟不同，
 /// 共用分块填充与按需截断恢复逻辑。
 macro_rules! int_array_storage {
-    ($tag:ident, $ty:ty, $suffixed:ident, $width:expr, $latency:expr) => {
+    ($tag:ident, $ty:ty, $suffixed:ident, $width:expr) => {
         Storage {
             ast: |ident, type_path, size, data| {
                 let mut ints = Vec::new();
@@ -92,7 +86,7 @@ macro_rules! int_array_storage {
             },
             support: |size| (128..=1024).contains(&size),
             security: 20,
-            latency: $latency,
+            latency: 20,
         }
     };
 }
@@ -111,23 +105,10 @@ pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| 
             },
             support: |_| true,
             security: 10,
-            latency: 2,
+            latency: 0,
         },
-        Storage {
-            ast: |ident, type_path, size, data| {
-                let bytes = data.iter().map(|&b| Literal2::u8_suffixed(b));
-                quote! {
-                    let mut #ident = #type_path::new();
-                    let temp_arr: [u8; #size] = [#(#bytes),*];
-                    unsafe { #ident.extend_from_slice(&temp_arr).unwrap_unchecked(); }
-                }
-            },
-            support: |size| size <= 256,
-            security: 10,
-            latency: 5,
-        },
-        int_array_storage!(U64, u64, u64_suffixed, 8, 8),
-        int_array_storage!(U128, u128, u128_suffixed, 16, 10),
+        int_array_storage!(U64, u64, u64_suffixed, 8),
+        int_array_storage!(U128, u128, u128_suffixed, 16),
         // MAC 地址隐写存储策略
         Storage {
             ast: |ident, type_path, size, data| {
@@ -150,8 +131,8 @@ pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| 
                 }
             },
             support: |size| (6..=967).contains(&size),
-            security: 45, // 较高的静态分析打扰度（IDA/Ghidra 提取字符串会误以为是网络配置）
-            latency: 15,  // 需要简单的字符串解析开销
+            security: 45,
+            latency: 15,
         },
         // UUID 隐写存储策略
         Storage {
@@ -190,7 +171,7 @@ pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| 
                 }
             },
             support: |size| (16..=1024).contains(&size),
-            security: 60, // 极高的伪装度，极为像系统的组件 GUID/UUID
+            security: 48,
             latency: 18,
         },
         // IPv6 隐写存储策略
@@ -230,7 +211,7 @@ pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| 
                 }
             },
             support: |size| (16..=1024).contains(&size),
-            security: 65, // 反汇编分析者容易将其归类为网络硬编码地址
+            security: 48,
             latency: 18,
         },
     ]

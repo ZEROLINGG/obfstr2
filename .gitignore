@@ -3,20 +3,28 @@ Cargo.lock
 logs/
 
 *.rs.bk
+**/*.rs.bk
 *.pdb
+*.iml
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
+!.vscode/extensions.json
+.direnv/
+.envrc.local
 
 # ========== 环境变量与密钥（防止误提交敏感信息） ==========
 .env
 .env.*
 !.env.example
 *.pem
+*.private.key
 *.key
 *.pfx
 id_rsa
 id_rsa.pub
+.secrets/
 *credentials*.json
 *credentials*.yaml
 *credentials*.yml

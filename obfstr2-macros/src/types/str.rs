@@ -2,21 +2,21 @@ use super::{b1, b2, b3, want_heap};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-pub fn s1(input: String) -> TokenStream2 {
+pub fn s1(input: String) -> Result<TokenStream2, String> {
     let size = input.len();
-    let ts = b1(input.into_bytes());
+    let ts = b1(input.into_bytes())?;
 
-    quote! {
+    Ok(quote! {
         {
             let mut bytes = #ts;
             unsafe { ::obfstr2::types::str::StackStr::<#size>::try_from(bytes.as_mut_slice()).unwrap_unchecked() }
         }
-    }
+    })
 }
 
-pub fn s2(input: String) -> TokenStream2 {
+pub fn s2(input: String) -> Result<TokenStream2, String> {
     let size = input.len();
-    let ts = b2(input.into_bytes());
+    let ts = b2(input.into_bytes())?;
 
     let main_type_path = if want_heap() {
         quote!(::obfstr2::types::str::HeapStr)
@@ -24,17 +24,17 @@ pub fn s2(input: String) -> TokenStream2 {
         quote!(::obfstr2::types::str::StackStr)
     };
 
-    quote! {
+    Ok(quote! {
         {
             let mut bytes = #ts;
             unsafe { #main_type_path::<#size>::try_from(bytes.as_mut_slice()).unwrap_unchecked() }
         }
-    }
+    })
 }
 
-pub fn s3(input: String) -> TokenStream2 {
+pub fn s3(input: String) -> Result<TokenStream2, String> {
     let size = input.len();
-    let ts = b3(input.into_bytes());
+    let ts = b3(input.into_bytes())?;
 
     let main_type_path = if cfg!(feature = "alloc") {
         quote!(::obfstr2::types::str::HeapStr)
@@ -42,10 +42,10 @@ pub fn s3(input: String) -> TokenStream2 {
         quote!(::obfstr2::types::str::StackStr)
     };
 
-    quote! {
+    Ok(quote! {
         {
             let mut bytes = #ts;
             unsafe { #main_type_path::<#size>::try_from(bytes.as_mut_slice()).unwrap_unchecked() }
         }
-    }
+    })
 }

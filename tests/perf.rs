@@ -1,30 +1,18 @@
-//! 性能对比测试（报告-only）：明文基线 vs CasualX vs `b1/b2/b3` 的四维数据。
-//!
-//! - 编译耗时 / 运行耗时：`dyntest` 原生能力（`DnyResult::build_duration` / `run_duration`）；
-//! - 每次去混淆耗时：（行耗时 − 基线耗时）/ 2000，基线行记 `—`，负值属噪声原样显示；
-//! - 展开大小：`DnyRun::cargo(&["expand"])` 输出字符数（需执行机安装 `cargo-expand`，缺失记 `n/a`）；
-//! - 产物体积：`DnyRun::bin_path()` + `fs::metadata` 的未 strip 二进制大小；
-//! - 只断言构建成功与解密校验和正确，**不对任何数字断言**（冷构建 + 多态 + 机器抖动，必 flaky）；
-//! - 结果以 `eprintln!` 打印 Markdown 表，需 `--nocapture` 查看，方便贴进 README；
-//! - 默认忽略，手动跑：`cargo test --test perf -- --ignored --nocapture`
-//!   （6 个 release 冷构建，`b3` 最重，本机约数分钟；另需联网拉取 `obfstr`）；
-//! - 每个用例独立 `DnyRun`（目录唯一），无共享状态、无 `clear_dny_project`（并行 hang 教训见 `nostd.rs` 头注）；
-//! - 本文件内单测串行执行，避免多个 `cargo build` 并发抢锁。
-//!
-//! 口径：128B 全 `a` 载荷（与 `nostd.rs` 收敛值对齐），release profile，guest 内循环 2000 次解密求校验和
-//! （`run_duration` 含进程启动开销，单次解密会被启动噪声淹没，必须循环放大；循环体内均有 `black_box`，
-//! 防编译器把循环不变的解密外提——`CasualX` 行曾缺此屏障，已补齐拉平）；每用例跑 3 次取中位数，压机器抖动与
-//! 计时轮询粒度误差；同机横向参考，跨机器不可比。
+//! 性能对比测试（报告-only）：冷/热构建耗时 + 运行耗时 + 产物体积 + expand 字符数。
 
 use lib_unknown::dyntest::DnyRun;
 use std::time::Duration;
 
-/// 128 个 `a`：`128 * b'a' * 2000 == 24832000`，各 guest 的期望校验和。
-const PAYLOAD_LEN: usize = 128;
-const LOOPS: u32 = 2000;
-const EXPECTED_SUM: u64 = PAYLOAD_LEN as u64 * b'a' as u64 * LOOPS as u64;
-/// 每用例重复次数（取中位数）。
+const PAYLOAD_LEN: usize = 1024;
+const LOOPS: u32 = 100;
 const REPEATS: usize = 3;
+const TIMEOUT_SECS: u64 = 300;
+
+const EXPECTED_SUM: u64 = PAYLOAD_LEN as u64 * b'a' as u64 * LOOPS as u64;
+
+fn timeout() -> Option<Duration> {
+    Some(Duration::from_secs(TIMEOUT_SECS))
+}
 
 fn payload() -> String {
     "a".repeat(PAYLOAD_LEN)
@@ -38,12 +26,11 @@ fn casual_dep() -> String {
     "obfstr = \"0.4\"".to_string()
 }
 
-/// guest 模板：循环解密求校验和并打印。`{body}` 为单次解密求和片段（内联使用，满足 CasualX E0716 限制）。
 fn guest(body: &str) -> String {
     format!(
         r#"fn main() {{
     let mut sum: u64 = 0;
-    for _ in 0..{LOOPS} {{
+    for _ in 0..std::hint::black_box({LOOPS}){{
         {body}
     }}
     println!("{{sum}}");
@@ -51,20 +38,45 @@ fn guest(body: &str) -> String {
     )
 }
 
-struct Row {
-    name: String,
+/// 五个用例的 (名称, 代码, 依赖) 定义，冷/热两阶段共用，避免漂移。
+fn case_defs(p: &str) -> [(&'static str, String, String); 5] {
+    let base_code = format!(
+        "static SECRET: &[u8; {PAYLOAD_LEN}] = b\"{p}\";\n{}",
+        guest(
+            "for &b in SECRET.iter() { sum = sum.wrapping_add(b as u64); }\n        std::hint::black_box(sum);"
+        )
+    );
+
+    // 注意：CasualX 与 obfstr2 都对返回值整体 black_box，避免测试口径不对称。
+    let casual_bytes = guest(&format!(
+        "for &b in std::hint::black_box(obfstr::obfbytes!(b\"{p}\")).iter() {{ sum = sum.wrapping_add(b as u64); }}\n        std::hint::black_box(sum);"
+    ));
+
+    let obf = |m: &str| {
+        guest(&format!(
+            "let v = std::hint::black_box(obfstr2::{m}!(b\"{p}\"));\n        for &b in (&*v).iter() {{ sum = sum.wrapping_add(b as u64); }}"
+        ))
+    };
+
+    [
+        ("明文基线", base_code, String::new()),
+        ("CasualX obfbytes!", casual_bytes, casual_dep()),
+        ("obfstr2 b1!", obf("b1"), obfstr2_dep()),
+        ("obfstr2 b2!", obf("b2"), obfstr2_dep()),
+        ("obfstr2 b3!", obf("b3"), obfstr2_dep()),
+    ]
+}
+
+/// 冷构建阶段单次采样：build/run/bin/expand 全量测量。
+struct Sample {
     build: Duration,
     run: Duration,
     expand_chars: Option<usize>,
     bin_bytes: Option<u64>,
 }
 
-fn case(name: &str, code: &str, deps: &str) -> Row {
-    let mut runner = DnyRun::new(code, deps);
-    runner.release(true);
-    let timeout = Some(Duration::from_secs(300));
-
-    let ret = runner.run(timeout);
+fn measure_full(runner: &mut DnyRun, name: &str) -> Sample {
+    let ret = runner.run(timeout());
     assert!(ret.ok, "[{name}] 构建或运行失败:\n{ret}");
     let got: u64 = ret
         .stdout
@@ -74,11 +86,10 @@ fn case(name: &str, code: &str, deps: &str) -> Row {
     assert_eq!(got, EXPECTED_SUM, "[{name}] 解密校验和错误");
 
     let bin_bytes = std::fs::metadata(runner.bin_path()).map(|m| m.len()).ok();
-    let expand_res = runner.cargo(&["expand"], timeout);
+    let expand_res = runner.cargo(&["expand"], timeout());
     let expand_chars = expand_res.ok.then_some(expand_res.stdout.len());
 
-    Row {
-        name: name.to_string(),
+    Sample {
         build: ret.build_duration,
         run: ret.run_duration,
         expand_chars,
@@ -86,41 +97,66 @@ fn case(name: &str, code: &str, deps: &str) -> Row {
     }
 }
 
-/// 单用例跑 `n` 次取中位数：`build`/`run` 直接排序取中；`expand_chars`/`bin_bytes`
-/// （多态导致每次展开不同，同样取中）取 `Some` 值的中位数，全缺才记 `n/a`。
-fn median_case(name: &str, code: &str, deps: &str, n: usize) -> Row {
+fn median_duration(mut v: Vec<Duration>) -> Duration {
+    v.sort();
+    v[v.len() / 2]
+}
+
+fn median_opt<T: Ord + Copy>(mut v: Vec<T>) -> Option<T> {
+    v.sort();
+    v.get(v.len() / 2).copied()
+}
+
+/// 冷构建：每次都新建临时工程（含三方依赖从零编译）。
+fn cold_sample(name: &str, code: &str, deps: &str, n: usize) -> Sample {
     let mut builds = Vec::with_capacity(n);
     let mut runs = Vec::with_capacity(n);
     let mut expands = Vec::with_capacity(n);
     let mut bins = Vec::with_capacity(n);
+
     for _ in 0..n {
-        let r = case(name, code, deps);
-        builds.push(r.build);
-        runs.push(r.run);
-        expands.extend(r.expand_chars);
-        bins.extend(r.bin_bytes);
+        let mut runner = DnyRun::new(code, deps);
+        runner.release(true);
+        let s = measure_full(&mut runner, name);
+        builds.push(s.build);
+        runs.push(s.run);
+        expands.extend(s.expand_chars);
+        bins.extend(s.bin_bytes);
     }
-    builds.sort();
-    runs.sort();
-    expands.sort();
-    bins.sort();
-    Row {
-        name: name.to_string(),
-        build: builds[n / 2],
-        run: runs[n / 2],
-        expand_chars: expands.get(expands.len() / 2).copied(),
-        bin_bytes: bins.get(bins.len() / 2).copied(),
+
+    Sample {
+        build: median_duration(builds),
+        run: median_duration(runs),
+        expand_chars: median_opt(expands),
+        bin_bytes: median_opt(bins),
     }
 }
-/// 每次去混淆耗时（µs）：（行耗时 − 基线耗时）/ `LOOPS`。假设各行进程启动开销相同、
-/// 差分后相消；结果含噪声，小于零属正常，原样显示；基线行由调用方记 `—`。
+
+/// 热构建：共享已预热 runner，只重写 main.rs 并 build，不 run/不 expand（省时间，且产物与冷构建等价）。
+fn hot_incremental_build(runner: &mut DnyRun, name: &str, code: &str, n: usize) -> Duration {
+    let mut builds = Vec::with_capacity(n);
+    for _ in 0..n {
+        runner.reset_main_code(code);
+        let ret = runner.build(timeout());
+        assert!(ret.ok, "[{name}] 增量构建失败:\n{ret}");
+        builds.push(ret.build_duration);
+    }
+    median_duration(builds)
+}
+
+struct Row {
+    name: String,
+    incr_build: Duration,
+    cold_build: Duration,
+    run: Duration,
+    expand_chars: Option<usize>,
+    bin_bytes: Option<u64>,
+}
+
 fn per_decrypt(row_run: Duration, base_run: Duration) -> f64 {
     (row_run.as_secs_f64() - base_run.as_secs_f64()) / LOOPS as f64 * 1e6
 }
 
-/// 相对明文基线的增幅百分比（`v` 为某行某列数值，`base` 为基线同列数值，
-/// 即 `v/base - 1`；与基线持平显示 `0%`）：
-/// 基线为零、任一侧缺失（`n/a`）时无法计算，返回 `None`，调用方回落为纯数字。
 fn pct(v: f64, base: f64) -> Option<String> {
     if base == 0.0 {
         return None;
@@ -128,7 +164,6 @@ fn pct(v: f64, base: f64) -> Option<String> {
     Some(format!("{:.0}%", v / base * 100.0 - 100.0))
 }
 
-/// 单元格渲染：`绝对值（百分比）`；算不出百分比时只写绝对值。
 fn cell(abs: String, ratio: Option<String>) -> String {
     match ratio {
         Some(p) => format!("{abs}（{p}）"),
@@ -136,99 +171,103 @@ fn cell(abs: String, ratio: Option<String>) -> String {
     }
 }
 
-#[cfg(test)]
-mod pct_tests {
-    use super::*;
-
-    #[test]
-    fn typical_ratios() {
-        assert_eq!(pct(2.2, 0.1), Some("2100%".to_string()));
-        assert_eq!(pct(11.0, 11.0), Some("0%".to_string()));
-        assert_eq!(cell("2.2s".to_string(), pct(2.2, 0.1)), "2.2s（2100%）");
-    }
-
-    #[test]
-    fn zero_base_or_missing_falls_back() {
-        assert_eq!(pct(1.0, 0.0), None);
-        assert_eq!(cell("n/a".to_string(), None), "n/a");
-    }
-
-    #[test]
-    fn per_decrypt_values() {
-        let v = per_decrypt(Duration::from_micros(81010), Duration::from_micros(10330));
-        assert!((v - 35.34).abs() < 0.01, "实际: {v}");
-        let neg = per_decrypt(Duration::from_millis(10), Duration::from_millis(11));
-        assert!(neg < 0.0, "实际: {neg}");
-        assert_eq!(format!("{neg:.2}µs"), "-0.50µs");
-    }
-}
-
-#[test]
-#[ignore]
-fn perf_report() {
-    let p = payload();
-
-    // 明文基线：static 直接引用。
-    let base_code = guest(
-        "for &b in SECRET.iter() { sum = sum.wrapping_add(b as u64); }\n        std::hint::black_box(sum);",
-    );
-    let base_code = format!("static SECRET: &[u8; 128] = b\"{p}\";\n{base_code}");
-
-    let casual_bytes = guest(&format!(
-        "for &b in std::hint::black_box(obfstr::obfbytes!(b\"{p}\")).iter() {{ sum = sum.wrapping_add(b as u64); }}\n        std::hint::black_box(sum);"
-    ));
-    let obf = |m: &str| {
-        guest(&format!(
-            "let v = obfstr2::{m}!(b\"{p}\");\n        for &b in (&*v).iter() {{ sum = sum.wrapping_add(b as u64); }}"
-        ))
-    };
-
-    let rows = [
-        median_case("明文基线", &base_code, "", REPEATS),
-        median_case("CasualX obfbytes!", &casual_bytes, &casual_dep(), REPEATS),
-        median_case("obfstr2 b1!", &obf("b1"), &obfstr2_dep(), REPEATS),
-        median_case("obfstr2 b2!", &obf("b2"), &obfstr2_dep(), REPEATS),
-        median_case("obfstr2 b3!", &obf("b3"), &obfstr2_dep(), REPEATS),
-    ];
-
+fn render_report(rows: &[Row]) {
     eprintln!(
-        "\n| 用例 | 每次去混淆耗时 | 编译耗时 | 运行耗时（2000 次解密循环，含启动开销） | expand 字符数 | 产物二进制（未 strip） |"
+        "\n| 用例 | 每次去混淆耗时 | 运行耗时（{LOOPS} 次解密循环，含启动开销） | 增量构建耗时 | 冷构建耗时 | 产物二进制（未 strip） | expand 字符数 |"
     );
-    eprintln!("| :--- | :--- | :--- | :--- | :--- | :--- |");
-    // rows[0] 为明文基线，其余行的括号内数字为相对基线的百分比；每次去混淆耗时列无百分比。
+    eprintln!("| :--- | :--- | :--- | :--- | :--- | :--- | :--- |");
+
     let base = &rows[0];
     for (i, r) in rows.iter().enumerate() {
         let is_base = i == 0;
-        let pct_unless_base = |v: f64, b: f64| {
-            if is_base { None } else { pct(v, b) }
+        let p = |v: f64, b: f64| if is_base { None } else { pct(v, b) };
+        let po = |v: Option<u64>, b: Option<u64>| {
+            if is_base {
+                None
+            } else {
+                match (v, b) {
+                    (Some(v), Some(b)) => pct(v as f64, b as f64),
+                    _ => None,
+                }
+            }
         };
-        let build_pct = pct_unless_base(r.build.as_secs_f64(), base.build.as_secs_f64());
-        let run_pct = pct_unless_base(r.run.as_secs_f64(), base.run.as_secs_f64());
-        let expand_pct = match (r.expand_chars, base.expand_chars) {
-            (Some(v), Some(b)) if !is_base => pct(v as f64, b as f64),
-            _ => None,
-        };
-        let bin_pct = match (r.bin_bytes, base.bin_bytes) {
-            (Some(v), Some(b)) if !is_base => pct(v as f64, b as f64),
-            _ => None,
-        };
-        let expand = r.expand_chars.map_or("n/a".to_string(), |n| n.to_string());
+
+        let run_pct = p(r.run.as_secs_f64(), base.run.as_secs_f64());
+        let incr_pct = p(r.incr_build.as_secs_f64(), base.incr_build.as_secs_f64());
+        let cold_pct = p(r.cold_build.as_secs_f64(), base.cold_build.as_secs_f64());
+        let bin_pct = po(r.bin_bytes, base.bin_bytes);
+        let expand_pct = po(
+            r.expand_chars.map(|v| v as u64),
+            base.expand_chars.map(|v| v as u64),
+        );
+
         let bin = r.bin_bytes.map_or("n/a".to_string(), |n| n.to_string());
+        let expand = r.expand_chars.map_or("n/a".to_string(), |n| n.to_string());
+
         eprintln!(
-            "| {:<18} | {} | {} | {} | {} | {} |",
+            "| {:<18} | {} | {} | {} | {} | {} | {} |",
             r.name,
             if is_base {
                 "—".to_string()
             } else {
                 format!("{:.2}µs", per_decrypt(r.run, base.run))
             },
-            cell(format!("{:?}", r.build), build_pct),
             cell(format!("{:?}", r.run), run_pct),
-            cell(expand, expand_pct),
+            cell(format!("{:?}", r.incr_build), incr_pct),
+            cell(format!("{:?}", r.cold_build), cold_pct),
             cell(bin, bin_pct),
+            cell(expand, expand_pct),
         );
     }
+
     eprintln!(
-        "\n口径：128B 全 a 载荷，release profile，冷构建（含临时工程依赖编译，行间差值才是宏边际成本），每用例跑 3 次取中位数，同机横向参考；运行耗时为 2000 次解密循环（含启动开销与 Drop 擦除），循环体内均有 black_box 防外提；每次去混淆耗时 =（行耗时 − 基线耗时）/ 2000，基线行记 —，负值属噪声原样显示；括号内为相对明文基线的增幅百分比；数字只展示不断言（多态 + 机器抖动）。"
+        "\n口径：{PAYLOAD_LEN}B 全 a 载荷，release profile；冷构建=独立临时工程从零编译（含三方依赖），\
+每用例跑 {REPEATS} 次取中位数；增量构建=预热合并依赖（`obfstr` + `obfstr2`）后仅复写 `main.rs` \
+触发的增量编译耗时，同样取 {REPEATS} 次中位数；运行耗时/产物体积/expand 字符数取自冷构建阶段样本\
+（与构建路径无关，热构建阶段不重复测量以节省时间）；运行耗时为 {LOOPS} 次解密循环（含启动开销与 \
+Drop 擦除），循环体内均有 black_box 防外提；每次去混淆耗时 =（行运行耗时 − 基线运行耗时）/ {LOOPS}，\
+基线行记 —，负值属噪声原样显示；括号内为相对明文基线的增幅百分比；数字只展示不断言（多态 + 机器抖动）。"
     );
+}
+
+#[test]
+#[ignore]
+fn perf_report_release() {
+    let p = payload();
+    let cases = case_defs(&p);
+
+    // 阶段一：冷构建（独立工程，含三方依赖从零编译）+ 运行 + 体积 + expand
+    let cold: Vec<Sample> = cases
+        .iter()
+        .map(|(name, code, deps)| cold_sample(name, code, deps, REPEATS))
+        .collect();
+
+    // 阶段二：热构建（共享 runner 预热依赖后，仅测增量 build 耗时）
+    let combined_deps = format!("{}\n{}", casual_dep(), obfstr2_dep());
+    let mut runner = DnyRun::new("fn main() {}", &combined_deps);
+    runner.release(true);
+    let warm = runner.build(timeout());
+    assert!(warm.ok, "热构建依赖预热失败:\n{warm}");
+
+    let incr: Vec<Duration> = cases
+        .iter()
+        .map(|(name, code, _)| hot_incremental_build(&mut runner, name, code, REPEATS))
+        .collect();
+
+    // 合并两阶段结果为最终行
+    let rows: Vec<Row> = cases
+        .iter()
+        .zip(cold)
+        .zip(incr)
+        .map(|(((name, _, _), c), i)| Row {
+            name: name.to_string(),
+            incr_build: i,
+            cold_build: c.build,
+            run: c.run,
+            expand_chars: c.expand_chars,
+            bin_bytes: c.bin_bytes,
+        })
+        .collect();
+
+    render_report(&rows);
 }

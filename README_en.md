@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor: 528136da5682e44770327bf768047d92b03b443f29095a1e37bad2b8e3fae23d (source: README.md) -->
+<!-- i18n-sync-anchor:(sha256:7fbf6dc44273d3bdeb10d7f8da1a0c5e84f5689fba4ce1a11a0d09e3326cde9a reviewed:false source:README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
 
@@ -14,17 +14,13 @@
 
 **Languages:** [简体中文](README.md) | English
 
-A polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible).
 
-Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a different trade-off: CasualX delivers out-of-the-box string hiding with minimal expansion size, while obfstr2 trades several times the expansion size for polymorphic defense — random chunking, randomly stacked primitives, multiple alternative storage forms, and junk-code interference — so the same input produces different ciphertext on every compilation, and batch recovery scripts cannot reuse a fixed pattern. Coverage goes beyond strings: on top of the `s/b/f` families, `i1~3!` / `fl1~3!` cover all integer and float literals (expanding to directly usable plain values), `cs1~3!` cover C strings (`"..."` / `c"..."` / `b"..."`, all three forms equivalent, `b"..."` can express non-UTF-8 payloads; expanding to owned containers that dereference to `CStr`), and `s_fmt!` covers format strings (literal chunks obfuscated one by one, then passed to `format!`) — seven input kinds through the same chunk → encrypt → store → emit kernel. Another key difference is data lifetime: obfstr2's container types (provided by `lib-unknown`) are automatically volatile-zeroed on `Drop`, so decrypted plaintext is wiped as soon as it is used instead of lingering on the stack / heap (`s/b/f/cs` containers; `i/fl` return plain values and `s_fmt!` returns `String`, with no automatic erasure — see the macro overview). That is why obfstr2 exists: **higher reverse-engineering cost, more polymorphic obfuscation, wider type coverage, and automatic erasure of sensitive data at the end of its lifetime**.
-
-- Same: literals in, expressions out; `no_std` compatible; obfuscation done at compile time, with `lib-unknown` as the only runtime dependency.
-- Different: CasualX macros return a reference borrowing a temporary (`let x = obfstr!(...)` triggers E0716 and can only be used inline), while obfstr2 returns owned containers (plain values for `i/fl`) that can be bound, passed around, and reused; CasualX expands to a single fixed form, obfstr2 takes a different form on every compilation; CasualX focuses on strings, obfstr2 additionally covers integers / floats / C strings / files / format strings.
+One-macro compile-time obfuscation: literals in, expressions out; obfuscation happens at compile time. The same input yields different ciphertext on every build, so batch recovery scripts cannot reuse a fixed pattern. Seven input kinds are covered — strings, bytes, files, integers, floats, C strings, and format strings — returning owned containers or directly usable plain values that can be bound, passed, and reused; string-like containers wipe their plaintext on `Drop`, leaving nothing on the stack / heap. The price is larger artifacts and non-reproducible builds; see Design Philosophy and Benchmarks for details.
 
 ## Contents
 
-- [Design Philosophy](#design-philosophy)
 - [Quick Start](#quick-start)
+- [Design Philosophy](#design-philosophy)
 - [Macro Overview](#macro-overview)
 - [Use Cases vs Non-Use Cases](#use-cases-vs-non-use-cases)
 - [Feature Flags](#feature-flags)
@@ -49,7 +45,7 @@ Same category as [CasualX/obfstr](https://github.com/CasualX/obfstr) but a diffe
 
 | We chose | Instead of | Why |
 | :--- | :--- | :--- |
-| Compile time and size for strength | Minimal runtime decryption overhead | A 128B input expands to ~57k characters and a ~485KB binary under `b3` (see Benchmarks); runtime is just linear decryption |
+| Compile time and size for strength | Minimal runtime decryption overhead | High-strength tiers expand significantly with payload (see Benchmarks); runtime is just linear decryption |
 | Different output on every build | Reproducible builds | Polymorphism is the core defense; identical artifact hashes are impossible by design |
 | Effectiveness-oriented obfuscation | Cryptographic security claims | The goal is raising batch-script recovery cost |
 
@@ -110,7 +106,7 @@ fn main() {
 | `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` float literals (empty suffix means `f64`)                                    | Low-latency / Balanced / High-strength                                              |
 | `cs1!` / `cs2!` / `cs3!` | `"..."` / `c"..."` / `b"..."` (`b"..."` may hold non-UTF-8 bytes; payload must not contain interior NUL) | Low-latency / Balanced / High-strength                                              |
 | `f1!` / `f2!` / `f3!`    | `"path/to/file"` file path literals                                                                      | Low-latency / Balanced / High-strength                                              |
-| `s_fmt!`                 | `"...{}..."` format string + args (tier 2)                                                               | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
+| `s_fmt!`                 | `"...{}..."` format string + args (tier 1)                                                               | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
 
 Notes:
 
@@ -161,31 +157,32 @@ MSRV is `1.98`, declared via `rust-version` in both `Cargo.toml` files.
 
 The sole source of the figures below is `tests/perf.rs` (re-runnable via `cargo test --test perf -- --ignored --nocapture`; report-only, figures shown but never asserted). Polymorphism makes every run differ; the table is a single measured sample, order-of-magnitude reference only.
 
-Test parameters:
-
 | Parameter | Value | Notes |
 |:---|:---|:---|
-| `PAYLOAD_LEN` | 128 | Payload size in bytes, all `a` (aligned with `nostd.rs`) |
-| `LOOPS` | 2000 | "Decrypt + checksum" rounds per guest |
+| `PAYLOAD_LEN` | 1024 | Payload size in bytes, all `a` |
+| `LOOPS` | 100 | "Decrypt + checksum" rounds per guest |
 | `REPEATS` | 3 | Repetitions per case, median taken |
-| profile | release | Cold builds (including temp-project dependency compilation) |
-| `EXPECTED_SUM` | 24832000 | Checksum assertion value (`128 × 97 × 2000`), correctness gate |
+| `TIMEOUT_SECS` | 300 | Per-build / per-run timeout in seconds |
+| profile | release | Cold builds compile temp projects from scratch (incl. deps); incremental builds only rewrite `main.rs` after warm-up |
+| `EXPECTED_SUM` | 9932800 | Checksum assertion value (`1024 × 97 × 100`), correctness gate |
 
-| Program                                 | Per-decryption cost | Build time | Run time (2000 decryption rounds, incl. startup) | Expanded chars | Binary (unstripped) |
-|:----------------------------------------|:--------------------|:-----------|:---------|:---------------|:--------------------|
-| Plaintext baseline (`static` reference) | — | 154.26ms   | 10.33ms | 519 | 444920 |
-| CasualX/obfstr 0.4                      | 0.07µs | 1.70s (1000%) | 10.46ms (1%) | 3279 (532%) | 447704 (1%) |
-| obfstr2 (`b1!`)                         | -0.00µs | 4.14s (2584%) | 10.32ms (-0%) | 19153 (3590%) | 458224 (3%) |
-| obfstr2 (`b2!`)                         | 20.15µs | 4.05s (2525%) | 50.62ms (390%) | 33721 (6397%) | 475576 (7%) |
-| obfstr2 (`b3!`)                         | 90.70µs | 4.65s (2912%) | 191.73ms (1757%) | 56987 (10880%) | 495704 (11%) |
+| Program | Per-decryption cost | Run time (100 decryption rounds, incl. startup) | Incremental build | Cold build | Binary (unstripped) | Expanded chars |
+|:---|:---|:---|:---|:---|:---|:---|
+| Plaintext baseline (`static` reference) | — | 10.28ms | 181.94ms | 507.73ms | 444960 | 1437 |
+| CasualX/obfstr 0.4 | 0.34µs | 10.32ms (0%) | 202.03ms (11%) | 1.22s (140%) | 447984 (1%) | 7780 (441%) |
+| obfstr2 (`b1!`) | 0.15µs | 10.30ms (0%) | 616.18ms (239%) | 3.76s (641%) | 493960 (11%) | 66690 (4541%) |
+| obfstr2 (`b2!`) | 101.11µs | 20.39ms (98%) | 779.72ms (329%) | 4.02s (692%) | 529488 (19%) | 109879 (7546%) |
+| obfstr2 (`b3!`) | 304.51µs | 40.73ms (296%) | 1.18s (550%) | 4.27s (741%) | 559696 (26%) | 154914 (10680%) |
 
 Parameter notes:
 
-- Per-decryption cost: `(row time − baseline time) / 2000`, in µs; assumes identical startup cost across rows, cancelled out by differencing; the baseline row shows `—`; rows indistinguishable from baseline come out ≈0 or negative, which is noise, shown as-is.
-- Build time: only cross-row differences reflect macro-expansion marginal cost, and percentages are diluted by the fixed cost — order of magnitude only.
-- Run time: includes process startup and container `Drop` wiping; every loop body carries a `black_box` (the `CasualX` row pins the decrypted value) so the compiler cannot hoist loop-invariant decryption out of the loop.
-- Expanded chars: `cargo expand` output length, including ~0.5k of boilerplate.
-- Binary: unstripped `fs::metadata` size at `DnyRun::bin_path()`, shown last.
+- Per-decryption cost: `(row time − baseline time) / 100`, in µs; assumes identical startup cost across rows, cancelled out by differencing; the baseline row shows `—`; rows indistinguishable from baseline come out ≈0 or negative, which is noise, shown as-is.
+- Run time: `LOOPS=100` decryption rounds (incl. process startup and container `Drop` wiping); every loop body carries a `black_box` (both `CasualX` and obfstr2 pin the whole decrypted value, symmetric methodology) so the compiler cannot hoist loop-invariant decryption out of the loop.
+- Incremental build: after a shared warm-up runner (prebuilt combined `obfstr` + `obfstr2` deps), only `main.rs` is rewritten for an incremental compile, median of 3 runs; measures `build` only, no run / size / expand.
+- Cold build: a fresh temp project compiled from scratch each time (incl. third-party deps), median of 3 runs; only cross-row differences reflect macro-expansion marginal cost, and percentages are diluted by the fixed cost — order of magnitude only.
+- Run time / binary size / expanded chars: sampled from the cold-build phase (build-path independent; the hot-build phase skips re-measuring them to save time).
+- Expanded chars: `cargo expand` output length (requires `cargo-expand` on the machine, `n/a` if missing), including ~0.5k of boilerplate.
+- Binary: unstripped `fs::metadata` size at `DnyRun::bin_path()`.
 - Parentheses: increase over the plaintext baseline in percent (baseline is the 0% origin); `-0%` is an integer-rounding artifact meaning marginally below baseline.
 
 
@@ -199,7 +196,7 @@ If you find a security vulnerability, please file an Issue directly (this repo h
 
 Issues and Pull Requests are welcome!
 
-- Local verification (layered, ~15s with warm cache):
+- Local verification:
   - `cargo test --test smoke --test s_fmt`: correctness of all macros, in-process assertions, milliseconds;
   - `cargo test --test compile_fail`: compile-time rejection of invalid inputs (isolated dyntest projects per case);
   - `cargo test --test nostd`: `x86_64-unknown-none` bare-metal link (`b1` pure-stack without allocator + `b2` with heap; install that target first);

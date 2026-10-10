@@ -1,6 +1,6 @@
 [package]
 name = "obfstr2-macros"
-version = "0.1.10"
+version = "0.1.11-preview"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"

@@ -42,38 +42,39 @@ fn build_float(parsed: ParsedFloat, inner: TokenStream2) -> TokenStream2 {
     }
 }
 
-pub fn fl1(parsed: ParsedFloat) -> TokenStream2 {
+pub fn fl1(parsed: ParsedFloat) -> Result<TokenStream2, String> {
     let inner = build_obfuscated_bytes(
         parsed.bytes.clone(),
         TIER_LOW,
         false, // nostd可用
         true,
-    );
-    build_float(parsed, inner)
+    )?;
+    Ok(build_float(parsed, inner))
 }
 
-pub fn fl2(parsed: ParsedFloat) -> TokenStream2 {
+pub fn fl2(parsed: ParsedFloat) -> Result<TokenStream2, String> {
     let inner = build_obfuscated_bytes(
         parsed.bytes.clone(),
         TIER_BALANCED,
         cfg!(feature = "alloc"),
         want_heap(),
-    );
-    build_float(parsed, inner)
+    )?;
+    Ok(build_float(parsed, inner))
 }
 
-pub fn fl3(parsed: ParsedFloat) -> TokenStream2 {
+pub fn fl3(parsed: ParsedFloat) -> Result<TokenStream2, String> {
     let inner = build_obfuscated_bytes(
         parsed.bytes.clone(),
         TIER_HIGH,
         cfg!(feature = "alloc"),
         cfg!(feature = "alloc"),
-    );
-    build_float(parsed, inner)
+    )?;
+    Ok(build_float(parsed, inner))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use super::*;
     use crate::parse::parse_float;
 
@@ -163,17 +164,17 @@ mod tests {
 
     #[test]
     fn polymorphic_two_expansions_differ() {
-        let a = fl2(parse("3.15")).to_string();
-        let b = fl2(parse("3.15")).to_string();
+        let a = fl2(parse("3.15")).expect("fl2").to_string();
+        let b = fl2(parse("3.15")).expect("fl2").to_string();
         assert_ne!(a, b, "两次展开应多态不同");
     }
 
     #[test]
     fn tiers_accept_edge_values() {
         for f in [fl1, fl2, fl3] {
-            assert!(!f(parse("0.0f32")).is_empty());
-            assert!(!f(parse("-0.0")).is_empty());
-            assert!(!f(parse("1.7976931348623157e308")).is_empty());
+            assert!(!f(parse("0.0f32")).expect("tier").is_empty());
+            assert!(!f(parse("-0.0")).expect("tier").is_empty());
+            assert!(!f(parse("1.7976931348623157e308")).expect("tier").is_empty());
         }
     }
 }

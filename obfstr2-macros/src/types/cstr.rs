@@ -21,22 +21,22 @@ fn with_nul(mut payload: Vec<u8>) -> Vec<u8> {
     payload
 }
 
-pub fn cs1(payload: Vec<u8>) -> TokenStream2 {
+pub fn cs1(payload: Vec<u8>) -> Result<TokenStream2, String> {
     // 容量 N 含结尾 `\0`；纯栈、无堆（nostd 可用），与 b1/s1 同策略。
     let size = payload.len() + 1;
-    let ts = b1(with_nul(payload));
+    let ts = b1(with_nul(payload))?;
 
-    quote! {
+    Ok(quote! {
         {
             let mut bytes = #ts;
             unsafe { ::obfstr2::types::cstr::StackCStr::<#size>::try_from(bytes.as_mut_slice()).unwrap_unchecked() }
         }
-    }
+    })
 }
 
-pub fn cs2(payload: Vec<u8>) -> TokenStream2 {
+pub fn cs2(payload: Vec<u8>) -> Result<TokenStream2, String> {
     let size = payload.len() + 1;
-    let ts = b2(with_nul(payload));
+    let ts = b2(with_nul(payload))?;
 
     let main_type_path = if want_heap() {
         quote!(::obfstr2::types::cstr::HeapCStr)
@@ -44,17 +44,17 @@ pub fn cs2(payload: Vec<u8>) -> TokenStream2 {
         quote!(::obfstr2::types::cstr::StackCStr)
     };
 
-    quote! {
+    Ok(quote! {
         {
             let mut bytes = #ts;
             unsafe { #main_type_path::<#size>::try_from(bytes.as_mut_slice()).unwrap_unchecked() }
         }
-    }
+    })
 }
 
-pub fn cs3(payload: Vec<u8>) -> TokenStream2 {
+pub fn cs3(payload: Vec<u8>) -> Result<TokenStream2, String> {
     let size = payload.len() + 1;
-    let ts = b3(with_nul(payload));
+    let ts = b3(with_nul(payload))?;
 
     let main_type_path = if cfg!(feature = "alloc") {
         quote!(::obfstr2::types::cstr::HeapCStr)
@@ -62,16 +62,17 @@ pub fn cs3(payload: Vec<u8>) -> TokenStream2 {
         quote!(::obfstr2::types::cstr::StackCStr)
     };
 
-    quote! {
+    Ok(quote! {
         {
             let mut bytes = #ts;
             unsafe { #main_type_path::<#size>::try_from(bytes.as_mut_slice()).unwrap_unchecked() }
         }
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use super::*;
     use crate::parse::parse_cstr;
 
@@ -135,8 +136,8 @@ mod tests {
 
     #[test]
     fn polymorphic_two_expansions_differ() {
-        let a = cs2(b"poly".to_vec()).to_string();
-        let b = cs2(b"poly".to_vec()).to_string();
+        let a = cs2(b"poly".to_vec()).expect("cs2").to_string();
+        let b = cs2(b"poly".to_vec()).expect("cs2").to_string();
         assert_ne!(a, b, "两次展开应多态不同");
     }
 
@@ -144,8 +145,8 @@ mod tests {
     fn tiers_accept_empty_and_single_byte() {
         for f in [cs1, cs2, cs3] {
             // 空载荷 → 仅结尾 NUL 的单字节内核（N = 1）
-            assert!(!f(Vec::new()).is_empty());
-            assert!(!f(vec![0x61]).is_empty());
+            assert!(!f(Vec::new()).expect("tier").is_empty());
+            assert!(!f(vec![0x61]).expect("tier").is_empty());
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "obfstr2"
-version = "0.1.10"
+version = "0.1.11-preview"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"
@@ -13,7 +13,7 @@ categories = ["no-std", "embedded"]
 
 
 [dependencies]
-obfstr2-macros = { version = "0.1", path = "obfstr2-macros" }
+obfstr2-macros = { version = "=0.1.11-preview", path = "obfstr2-macros" }
 lib-unknown = { version = "0.1.6", default-features = false, features = ["crypto", "types"] }
 
 

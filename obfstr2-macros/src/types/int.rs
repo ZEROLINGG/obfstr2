@@ -60,38 +60,39 @@ fn build_int(parsed: ParsedInt, inner: TokenStream2) -> TokenStream2 {
     }
 }
 
-pub fn i1(parsed: ParsedInt) -> TokenStream2 {
+pub fn i1(parsed: ParsedInt) -> Result<TokenStream2, String> {
     let inner = build_obfuscated_bytes(
         parsed.bytes.clone(),
         TIER_LOW,
         false, // nostd可用
         true,
-    );
-    build_int(parsed, inner)
+    )?;
+    Ok(build_int(parsed, inner))
 }
 
-pub fn i2(parsed: ParsedInt) -> TokenStream2 {
+pub fn i2(parsed: ParsedInt) -> Result<TokenStream2, String> {
     let inner = build_obfuscated_bytes(
         parsed.bytes.clone(),
         TIER_BALANCED,
         cfg!(feature = "alloc"),
         want_heap(),
-    );
-    build_int(parsed, inner)
+    )?;
+    Ok(build_int(parsed, inner))
 }
 
-pub fn i3(parsed: ParsedInt) -> TokenStream2 {
+pub fn i3(parsed: ParsedInt) -> Result<TokenStream2, String> {
     let inner = build_obfuscated_bytes(
         parsed.bytes.clone(),
         TIER_HIGH,
         cfg!(feature = "alloc"),
         cfg!(feature = "alloc"),
-    );
-    build_int(parsed, inner)
+    )?;
+    Ok(build_int(parsed, inner))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
     use super::*;
     use crate::parse::parse_int;
 
@@ -177,8 +178,8 @@ mod tests {
     fn polymorphic_two_expansions_differ() {
         let p = || parse("42u32");
         // ParsedInt 不可 Clone（bytes Vec 可 clone 但 parse 每次重新来，保证输入一致）
-        let a = i2(parse("42u32")).to_string();
-        let b = i2(parse("42u32")).to_string();
+        let a = i2(parse("42u32")).expect("i2").to_string();
+        let b = i2(parse("42u32")).expect("i2").to_string();
         assert_ne!(a, b, "两次展开应多态不同");
         let _ = p;
     }
@@ -186,9 +187,13 @@ mod tests {
     #[test]
     fn tiers_accept_edge_values() {
         for f in [i1, i2, i3] {
-            assert!(!f(parse("0u8")).is_empty());
-            assert!(!f(parse("-128i8")).is_empty());
-            assert!(!f(parse("18446744073709551615u64")).is_empty());
+            assert!(!f(parse("0u8")).expect("tier").is_empty());
+            assert!(!f(parse("-128i8")).expect("tier").is_empty());
+            assert!(
+                !f(parse("18446744073709551615u64"))
+                    .expect("tier")
+                    .is_empty()
+            );
         }
     }
 }

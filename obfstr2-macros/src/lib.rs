@@ -14,50 +14,84 @@ mod types;
 
 use proc_macro::TokenStream;
 
-fn expand_str(input: TokenStream, build: fn(String) -> proc_macro2::TokenStream) -> TokenStream {
+fn err_to_compile_error(span: proc_macro2::Span, msg: String) -> TokenStream {
+    syn::Error::new(span, msg).to_compile_error().into()
+}
+
+fn expand_str(
+    input: TokenStream,
+    build: fn(String) -> Result<proc_macro2::TokenStream, String>,
+) -> TokenStream {
     match parse::parse_str(input.into()) {
-        Ok(s) => build(s).into(),
+        Ok(s) => match build(s) {
+            Ok(ts) => ts.into(),
+            Err(e) => err_to_compile_error(proc_macro2::Span::call_site(), e),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }
 
-fn expand_bytes(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
+fn expand_bytes(
+    input: TokenStream,
+    build: fn(Vec<u8>) -> Result<proc_macro2::TokenStream, String>,
+) -> TokenStream {
     match parse::parse_bytes(input.into()) {
-        Ok(bytes) => build(bytes).into(),
+        Ok(bytes) => match build(bytes) {
+            Ok(ts) => ts.into(),
+            Err(e) => err_to_compile_error(proc_macro2::Span::call_site(), e),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }
 
 fn expand_int(
     input: TokenStream,
-    build: fn(parse::ParsedInt) -> proc_macro2::TokenStream,
+    build: fn(parse::ParsedInt) -> Result<proc_macro2::TokenStream, String>,
 ) -> TokenStream {
     match parse::parse_int(input.into()) {
-        Ok(parsed) => build(parsed).into(),
+        Ok(parsed) => match build(parsed) {
+            Ok(ts) => ts.into(),
+            Err(e) => err_to_compile_error(proc_macro2::Span::call_site(), e),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }
 
 fn expand_float(
     input: TokenStream,
-    build: fn(parse::ParsedFloat) -> proc_macro2::TokenStream,
+    build: fn(parse::ParsedFloat) -> Result<proc_macro2::TokenStream, String>,
 ) -> TokenStream {
     match parse::parse_float(input.into()) {
-        Ok(parsed) => build(parsed).into(),
+        Ok(parsed) => match build(parsed) {
+            Ok(ts) => ts.into(),
+            Err(e) => err_to_compile_error(proc_macro2::Span::call_site(), e),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }
 
-fn expand_cstr(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
+fn expand_cstr(
+    input: TokenStream,
+    build: fn(Vec<u8>) -> Result<proc_macro2::TokenStream, String>,
+) -> TokenStream {
     match parse::parse_cstr(input.into()) {
-        Ok(payload) => build(payload).into(),
+        Ok(payload) => match build(payload) {
+            Ok(ts) => ts.into(),
+            Err(e) => err_to_compile_error(proc_macro2::Span::call_site(), e),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }
 
-fn expand_file(input: TokenStream, build: fn(Vec<u8>) -> proc_macro2::TokenStream) -> TokenStream {
+fn expand_file(
+    input: TokenStream,
+    build: fn(Vec<u8>) -> Result<proc_macro2::TokenStream, String>,
+) -> TokenStream {
     match parse::parse_file(input.into()) {
-        Ok(data) => build(data).into(),
+        Ok(data) => match build(data) {
+            Ok(ts) => ts.into(),
+            Err(e) => err_to_compile_error(proc_macro2::Span::call_site(), e),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }
@@ -163,7 +197,7 @@ pub fn f3(input: TokenStream) -> TokenStream {
     expand_file(input, types::b3)
 }
 
-/// 格式化字符串混淆宏本体（2 档）：首参须为字符串字面量，其中的字面量片段逐个混淆后注入 `format!` 调用，
+/// 格式化字符串混淆宏本体（1 档）：首参须为字符串字面量，其中的字面量片段逐个混淆后注入 `format!` 调用，
 /// 占位符与后续参数原样保留。返回 `String`，需要调用方有 `std` / `alloc`。
 ///
 /// # Warning

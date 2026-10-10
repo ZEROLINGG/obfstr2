@@ -32,6 +32,34 @@
 
 ---
 
+## [0.1.11-preview] - 2026-10-10
+
+### Changed
+- `.gitignore` 补齐标准 Rust 忽略条目（`**/*.rs.bk`、`*.iml`、`Thumbs.db`、`!.vscode/extensions.json`、`.direnv/`、`.envrc.local`、`*.private.key`、`.secrets/`）
+- README 综合项目介绍改写为 4 句自我介绍（去首句复述、去 CasualX 对比，机制细节下沉至设计哲学/宏一览；英文版同步翻译待校对）
+- 混淆内核重构为 `LayerCtx` 自报告长度 + SSA 式 `dec`（`enc: fn(&mut LayerCtx, Vec<u8>) -> Vec<u8>`，`dec: fn(&LayerCtx, Ident) -> (AST, Ident)`，`core.rs` 以 `LayerRecord` 快照逐层逆序 fold 串联；原语按当前 `data.len()` 逐层重过滤，`out_size` 不一致直接编译期报错）
+- 新增 2 个变长原语：PKCS7 补到 16B 边界、尾部 4B `mix64(key^iv^len)` 标签（`dec` 均为截断到 `pt_len` 的新容器，不校验）
+- **[BREAKING]** 纯栈预算 `STACK_BUDGET=1024`：chunk 中间容器峰值超限且无堆可用时编译期报错（不再静默回退）；`peak<=32` 强制栈；垃圾块整套删除（`junk_pct` 留参待清理，`ghost_state` 仅保留防 DCE 累加）
+- 失败显性化：`build_obfuscated_bytes` 及 `b/s/cs/i/fl` 全档位改为 `Result<TokenStream, String>`，`lib.rs::expand_*` 与 `s_fmt` 统一转 `compile_error` 定位调用点
+- 存储策略瘦身调参：删除 `size<=256` 的 `temp_arr` 策略，`u64`/`u128` 延迟统一 20，首项 `static &[u8]` 延迟 2→0，`UUID`/`IPv6` 安全分 60/65→48
+- `s_fmt!` 字面量片段由 2 档改为 1 档（纯栈低延迟，`format!` 展开更小；根/宏文档与 README 中英宏一览同步）
+- `tests/perf.rs` 改为 1024B×100 次口径 + 冷/热双构建（独立工程从零编译取中位数 vs 预热后复写 `main.rs` 的增量编译；运行/体积/expand 只取冷构建样本；`case_defs` 两阶段共用防漂移）
+- README 性能节同步新口径（参数表 + 七列表头 + 口径说明），权衡取舍节去掉 128B 旧绝对值，填入本次 1024B 实测示例（中英同步）
+
+### Deprecated
+-
+
+### Removed
+-
+
+### Fixed
+-
+
+### Security
+-
+
+---
+
 ## [0.1.10] - 2026-10-09
 
 ### Changed
@@ -164,7 +192,8 @@
 
 ---
 
-[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.11-preview...HEAD
+[0.1.11-preview]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.10...v0.1.11-preview
 [0.1.10]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.7...v0.1.8

@@ -131,7 +131,7 @@ fn parse_placeholder(
     Ok(ph)
 }
 
-/// 用 s2 档混淆格式串中的字面量部分，展开为 `::std::format!` 调用（返回 `String`）。
+/// 用 s1 档混淆格式串中的字面量部分，展开为 `::std::format!` 调用（返回 `String`）。
 pub fn sfmt(input: TokenStream2) -> TokenStream2 {
     let args = match syn::parse2::<FormatArgs>(input) {
         Ok(args) => args,
@@ -159,9 +159,15 @@ pub fn sfmt(input: TokenStream2) -> TokenStream2 {
             Chunk::Text(text) => {
                 let unescaped_text = text.replace("{{", "{").replace("}}", "}");
                 let arg_name = quote::format_ident!("__s_fmt_chunk_{}_{}__", obf_idx, suffix);
+
                 new_fmt.push_str(&format!("{{{arg_name}}}"));
 
-                let ts = crate::types::s2(unescaped_text);
+                let ts = match crate::types::s1(unescaped_text) {
+                    Ok(ts) => ts,
+                    Err(e) => {
+                        return syn::Error::new(args.fmt_lit.span(), e).to_compile_error();
+                    }
+                };
                 obf_injections.push(quote! { #arg_name = #ts });
 
                 obf_idx += 1;
