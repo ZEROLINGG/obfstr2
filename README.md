@@ -150,6 +150,8 @@ MSRV 为 `1.98`，已在双 `Cargo.toml` 的 `rust-version` 声明。
 
 以下数据的唯一来源是 `tests/perf.rs`（`cargo test --test perf -- --ignored --nocapture` 可复跑；报告-only，数字只展示不断言）。多态导致每次结果不同，下表为单次实测示例，仅供量级参考。
 
+原语级 L 分依据见 `tests/perf_crypto.rs`（`cargo test --test perf_crypto -- --ignored --nocapture` 可复跑；dec 等价体 × 长度扫描，只校准 L，S 维持论证口径）。
+
 | 参数             | 取值      | 说明                                                        |
 |:---------------|:--------|:----------------------------------------------------------|
 | `PAYLOAD_LEN`  | 1024    | 载荷字节数，全 `a`                                               |

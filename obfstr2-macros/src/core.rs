@@ -37,39 +37,101 @@ pub(crate) struct LayerRecord {
 }
 
 /// 逆序解密 fold：`(AST, Ident_out) = dec(ctx, Ident_in)` 串联。
-fn build_dec2(
+///
+/// 每层按档位概率抛硬币：包装层发射统一签名
+/// `#[cold]#[inline(never)] fn __dec_layer_{tag}(mut enc: Family<CT>) -> Family<PT>`，
+/// 等长/变长不分支（变长多余的 `mut` 由 `allow(unused_mut)` 消化）；
+/// 外层以 `__v_{tag}` 承接返回值，避免函数名被 `let` 遮蔽。
+/// 包装层附带 `black_box(f) as usize` 显式消费函数地址（`allow(function_casts_as_integer)`）。
+/// 档位概率的单调 backpressure：`eff = base * (1 + base/100)^inline_count`，封顶 100。
+///
+/// `inline_count` 为本次宏展开累计内联层数（只增不减，跨 chunk 传递）；
+/// 大载荷下内联越多、后续包装概率越高，避免调用方函数体线性膨胀拖慢编译。
+/// `base == 0` 恒内联；`inline_count >= 64` 直接封顶（防 `powi` 上溢到 `inf`）。
+fn effective_wrap_pct(base: u8, inline_count: u32) -> u8 {
+    if base == 0 {
+        return 0;
+    }
+    if inline_count >= 64 {
+        return 100;
+    }
+    (base as f64 * (1.0 + base as f64 / 100.0).powi(inline_count as i32)).min(100.0) as u8
+}
+
+fn build_dec_layers(
     layers: &[LayerRecord],
     family: &TokenStream2,
     entry: Ident2,
     tag_prefix: &str,
-) -> (TokenStream2, Ident2) {
-    layers.iter().rev().enumerate().fold(
-        (TokenStream2::new(), entry),
-        |(mut ts, ident), (rev_pos, layer)| {
-            let enc_idx = layers.len() - 1 - rev_pos;
+    wrap_pct: u8,
+    inline_count: &mut u32,
+) -> (TokenStream2, TokenStream2, Ident2) {
+    let mut prelude = TokenStream2::new();
+    let mut body = TokenStream2::new();
+    let mut cur = entry;
+    for (rev_pos, layer) in layers.iter().rev().enumerate() {
+        let enc_idx = layers.len() - 1 - rev_pos;
+        let tag = format!("{tag_prefix}_{enc_idx}");
+        let ct = layer.ct_len;
+        let pt = layer.pt_len;
+        // 档位控制的非内联概率 + 单调累积：0=全内联，>=100=全包装。
+        let wrap = random_range(0..100u8) < effective_wrap_pct(wrap_pct, *inline_count);
+        if wrap {
+            let dec_fn = format_ident!("__dec_layer_{tag}");
+            let val = format_ident!("__v_{tag}");
+            let param = format_ident!("enc");
             let ctx = LayerCtx {
                 type_path: family.clone(),
                 key: layer.key,
                 iv: layer.iv,
                 in_size: layer.pt_len,
                 out_size: layer.ct_len,
-                ident_tag: format!("{tag_prefix}_{enc_idx}"),
+                ident_tag: tag.clone(),
             };
-            let (frag, next_ident) = (layer.crypto.dec)(&ctx, ident);
-            ts.extend(frag);
-            (ts, next_ident)
-        },
-    )
+            let (frag, next_ident) = (layer.crypto.dec)(&ctx, param);
+            let in_ty = quote!(#family<#ct>);
+            let out_ty = quote!(#family<#pt>);
+            prelude.extend(quote! {
+                #[cold]
+                #[inline(never)]
+                #[allow(unused_mut)]
+                fn #dec_fn(mut enc: #in_ty) -> #out_ty {
+                    #frag
+                    ::core::hint::black_box(#next_ident)
+                }
+            });
+            body.extend(quote! {
+                #[allow(function_casts_as_integer)]
+                let _ = ::core::hint::black_box(#dec_fn) as usize;
+                let mut #val = #dec_fn(#cur);
+            });
+            cur = val;
+        } else {
+            let ctx = LayerCtx {
+                type_path: family.clone(),
+                key: layer.key,
+                iv: layer.iv,
+                in_size: layer.pt_len,
+                out_size: layer.ct_len,
+                ident_tag: tag,
+            };
+            let (frag, next_ident) = (layer.crypto.dec)(&ctx, cur);
+            body.extend(frag);
+            cur = next_ident;
+            *inline_count += 1;
+        }
+    }
+    (prelude, body, cur)
 }
 
-/// 强度档位公共参数（延迟上限 / 组合安全度下限 / 原语叠加倍率）。
-///
-/// `allow_heap` / `stack_main_bytes` 与档位正交（`no_std` 可用性与主容器策略），保留在调用点，不进表。
+/// 强度档位公共参数（延迟上限 / 组合安全度下限 / 原语叠加倍率 / 逐层非内联包装概率）。
 #[derive(Clone, Copy)]
 pub(crate) struct TierParams {
     pub(crate) max_latency: u8,
     pub(crate) min_security: u8,
     pub(crate) magnification: u8,
+    /// 逐层 `#[cold]#[inline(never)]` 包装概率 0..=100（`build_dec_layers` 按层抛硬币）。
+    pub(crate) wrap_pct: u8,
     /// 垃圾块填充概率（本阶段重构暂不使用）。
     #[allow(dead_code)]
     pub(crate) junk_pct: u8,
@@ -77,25 +139,28 @@ pub(crate) struct TierParams {
 
 /// 低延迟档（`s1` / `b1` / `i1` / `fl1` / `cs1`）：纯栈，`no_std` 可用。
 pub(crate) const TIER_LOW: TierParams = TierParams {
-    max_latency: 30,
+    max_latency: 20,
     min_security: 0,
     magnification: 1,
+    wrap_pct: 15,
     junk_pct: 5,
 };
 
 /// 均衡档（`s2` / `b2` / `i2` / `fl2` / `cs2`）：堆栈随机。
 pub(crate) const TIER_BALANCED: TierParams = TierParams {
     max_latency: 100,
-    min_security: 50,
+    min_security: 18,
     magnification: 2,
+    wrap_pct: 50,
     junk_pct: 20,
 };
 
 /// 高强度档（`s3` / `b3` / `i3` / `fl3` / `cs3`）：`alloc` 下主容器走堆。
 pub(crate) const TIER_HIGH: TierParams = TierParams {
     max_latency: 100,
-    min_security: 95,
+    min_security: 60,
     magnification: 4,
+    wrap_pct: 85,
     junk_pct: 40,
 };
 
@@ -134,6 +199,8 @@ pub(crate) fn build_obfuscated_bytes(
         let mut #ghost_state: u8 = 0_u8;
     });
 
+    // 单调累积的内联计数：跨 chunk 传递，内联越多后续包装概率越高。
+    let mut inline_total: u32 = 0;
     for (i, chunk) in (1..).zip(chunks) {
         let bytes_chunk = format_ident!("__bytes_chunk_{id}_{i}");
         let pt_len = chunk.len();
@@ -153,7 +220,7 @@ pub(crate) fn build_obfuscated_bytes(
             let in_len = data.len();
             let (key, iv) = (random::<u64>(), random::<u8>());
             // enc 期间 type_path/ident_tag 无意义（enc 从不读它们），填空即可；
-            // dec 时由 build_dec2 重填家族与确定性后缀。
+            // dec 时由 build_dec_layers 重填家族与确定性后缀。
             let mut ctx = LayerCtx {
                 type_path: TokenStream2::new(),
                 key,
@@ -202,7 +269,7 @@ pub(crate) fn build_obfuscated_bytes(
                     "chunk#{i} 需要 {peak}B 中间容器，超过纯栈上限 {STACK_BUDGET}B 且无堆可用"
                 ));
             }
-        } else if peak <= 32 {
+        } else if peak <= 16 {
             false
         } else {
             allow_heap && random::<bool>()
@@ -222,99 +289,28 @@ pub(crate) fn build_obfuscated_bytes(
         let mut pool = pool;
         let storage_strategy = pool.swap_remove(random_range(0..pool.len()));
 
-        // 空轨迹（首轮即无可用原语）无解密可做，强制内联直写，跳过 dec_fn 包装。
-        let mode = if layers.is_empty() {
-            2
-        } else {
-            random_range(0..3)
-        };
-        match mode {
-            0 => {
-                let dec_fn = format_ident!("__dec_fn_{id}_{i}");
-                let storage_expr = quote!(#chunk_type_path::<#ct_len>);
-                let ret_expr = quote!(#chunk_type_path::<#pt_len>);
-                let storage_ast =
-                    (storage_strategy.ast)(&bytes_chunk, &storage_expr, ct_len, &ciphertext);
-                let (dec_ts, final_ident) = build_dec2(
-                    &layers,
-                    &chunk_type_path,
-                    bytes_chunk.clone(),
-                    &format!("{id}_{i}"),
-                );
-                let first_iv = layers.first().map(|l| l.iv).unwrap_or(0u8);
+        let storage_expr = quote!(#chunk_type_path::<#ct_len>);
+        let storage_ast =
+            (storage_strategy.ast)(&bytes_chunk, &storage_expr, ct_len, &ciphertext);
+        // 逐层档位概率包装 + 单调 backpressure：内联 frag 与统一签名 fn 混排（空轨迹时 layers 为空，直接直写）。
+        let (dec_prelude, dec_body, final_ident) = build_dec_layers(
+            &layers,
+            &chunk_type_path,
+            bytes_chunk.clone(),
+            &format!("{id}_{i}"),
+            tier.wrap_pct,
+            &mut inline_total,
+        );
 
-                ts.extend(quote! {
-                    {
-                        #[cold]
-                        #[inline(never)]
-                        fn #dec_fn(x: u8) -> #ret_expr {
-                            // 调用方恒传 first_iv，恒走真分支；else 仅为反静态分析的死分支（空 extend 是 no-op）。
-                            if core::hint::black_box(x) ^ core::hint::black_box(#first_iv) == 0 {
-                                #storage_ast
-                                #dec_ts
-                                core::hint::black_box(#final_ident)
-                            } else {
-                                #ret_expr::new()
-                            }
-                        }
-                        unsafe { #bytes.extend_from_slice(#dec_fn(#first_iv).as_slice()).unwrap_unchecked(); }
-                    }
-                });
+        ts.extend(quote! {
+            {
+                #storage_ast
+                #dec_prelude
+                #dec_body
+                unsafe { #bytes.extend_from_slice(#final_ident.as_slice()).unwrap_unchecked(); }
+                drop(#final_ident);
             }
-            1 => {
-                let dec_fn = format_ident!("__dec_fn_{id}_{i}");
-                let storage_expr = quote!(#chunk_type_path::<#ct_len>);
-                let ret_expr = quote!(#chunk_type_path::<#pt_len>);
-                let storage_ast =
-                    (storage_strategy.ast)(&bytes_chunk, &storage_expr, ct_len, &ciphertext);
-                let (dec_ts, final_ident) = build_dec2(
-                    &layers,
-                    &chunk_type_path,
-                    bytes_chunk.clone(),
-                    &format!("{id}_{i}"),
-                );
-                let first_iv = layers.first().map(|l| l.iv).unwrap_or(0u8);
-
-                ts.extend(quote! {
-                    {
-                        #[cold]
-                        #[inline(never)]
-                        fn #dec_fn(x: u8, d: &mut #main_type_path<#size>) {
-                            // 调用方恒传 first_iv，恒走真分支；else 仅为反静态分析的死分支（空 extend 是 no-op）。
-                            if core::hint::black_box(x) ^ core::hint::black_box(#first_iv) == 0 {
-                                #storage_ast
-                                #dec_ts
-                                unsafe { d.extend_from_slice(#final_ident.as_slice()).unwrap_unchecked(); }
-                            } else {
-                                let #bytes_chunk = #ret_expr::new();
-                                unsafe { d.extend_from_slice(#bytes_chunk.as_slice()).unwrap_unchecked(); }
-                            }
-                        }
-                        core::hint::black_box(#dec_fn(#first_iv, &mut #bytes));
-                    }
-                });
-            }
-            _ => {
-                let storage_expr = quote!(#chunk_type_path::<#ct_len>);
-                let storage_ast =
-                    (storage_strategy.ast)(&bytes_chunk, &storage_expr, ct_len, &ciphertext);
-                let (dec_ts, final_ident) = build_dec2(
-                    &layers,
-                    &chunk_type_path,
-                    bytes_chunk.clone(),
-                    &format!("{id}_{i}"),
-                );
-
-                ts.extend(quote! {
-                    {
-                        #storage_ast
-                        #dec_ts
-                        unsafe { #bytes.extend_from_slice(#final_ident.as_slice()).unwrap_unchecked(); }
-                        drop(#final_ident);
-                    }
-                });
-            }
-        }
+        });
 
         // ghost 最小使用：防 DCE 的单调累加，不含 junk 干扰。
         ts.extend(quote! {
@@ -331,4 +327,36 @@ pub(crate) fn build_obfuscated_bytes(
             #bytes
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used)]
+    use super::*;
+
+    #[test]
+    fn effective_wrap_pct_starts_at_base() {
+        assert_eq!(effective_wrap_pct(15, 0), 15);
+        assert_eq!(effective_wrap_pct(50, 0), 50);
+        assert_eq!(effective_wrap_pct(85, 0), 85);
+        assert_eq!(effective_wrap_pct(0, 999), 0);
+    }
+
+    #[test]
+    fn effective_wrap_pct_grows_and_caps() {
+        // base=50: 50 -> 75 -> 112->100
+        assert_eq!(effective_wrap_pct(50, 1), 75);
+        assert_eq!(effective_wrap_pct(50, 2), 100);
+        // base=85: 一次内联后即封顶
+        assert_eq!(effective_wrap_pct(85, 1), 100);
+        // 单调不减并封顶
+        let mut prev = 0;
+        for i in 0..70 {
+            let cur = effective_wrap_pct(15, i);
+            assert!(cur >= prev, "i={i}: {cur} < {prev}");
+            prev = cur;
+        }
+        assert_eq!(effective_wrap_pct(15, 64), 100);
+        assert_eq!(effective_wrap_pct(15, 1000), 100);
+    }
 }

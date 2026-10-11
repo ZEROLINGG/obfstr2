@@ -25,3 +25,5 @@ default = [
 
 [dev-dependencies]
 lib-unknown = { version = "0.1.6", features = ["dyntest", "std"] }
+# 仅 tests/perf_crypto.rs 测 L=80 锚点（Ascon-128 AEAD）用
+ascon-aead = { version = "0.6", default-features = false, features = ["alloc"] }

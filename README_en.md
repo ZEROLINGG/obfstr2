@@ -1,5 +1,5 @@
 # obfstr2
-<!-- i18n-sync-anchor:(sha256:7fbf6dc44273d3bdeb10d7f8da1a0c5e84f5689fba4ce1a11a0d09e3326cde9a reviewed:false source:README.md) -->
+<!-- i18n-sync-anchor:(sha256:d4d5651d1db439a21c0678b16b46a979959da2c391031a7505af05d666a9142f reviewed:false source:README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
 
@@ -156,6 +156,8 @@ MSRV is `1.98`, declared via `rust-version` in both `Cargo.toml` files.
 ## Benchmarks
 
 The sole source of the figures below is `tests/perf.rs` (re-runnable via `cargo test --test perf -- --ignored --nocapture`; report-only, figures shown but never asserted). Polymorphism makes every run differ; the table is a single measured sample, order-of-magnitude reference only.
+
+Per-primitive L scores are grounded in `tests/perf_crypto.rs` (re-runnable via `cargo test --test perf_crypto -- --ignored --nocapture`; decryption-equivalent × length sweep, calibrates L only, S stays argument-based).
 
 | Parameter | Value | Notes |
 |:---|:---|:---|

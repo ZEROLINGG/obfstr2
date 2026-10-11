@@ -71,3 +71,31 @@ jobs:
         run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  github-release:
+    needs: publish-obfstr2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VER="${TAG#v}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping"
+            exit 0
+          fi
+          NOTES=$(awk -v ver="$VER" '$0~"^## \\["ver"\\]"{f=1;next} /^## \[/{f=0} f' CHANGELOG.md)
+          FLAGS="--title $TAG"
+          case "$TAG" in
+            *"-"*) FLAGS="$FLAGS --prerelease" ;;
+          esac
+          if [ -n "$NOTES" ]; then
+            # shellcheck disable=SC2086
+            gh release create "$TAG" $FLAGS --notes "$NOTES"
+          else
+            # shellcheck disable=SC2086
+            gh release create "$TAG" $FLAGS --generate-notes
+          fi

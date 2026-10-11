@@ -13,10 +13,17 @@
 ## [Unreleased]
 
 ### Added
--
+- `tests/perf_crypto.rs` 原语级 L 标定测试（报告-only，默认忽略）：17 行 `dec` 等价体 × 5 长度扫描，拟合 `ns=fixed+k·len`，以同 harness Ascon-128 斜率为 L=80 锚点换算；根 `Cargo.toml` 新增 `ascon-aead` dev 依赖仅供该测试用
+- 解密逐层包装概率 `TierParams::wrap_pct`（LOW 15 / BALANCED 50 / HIGH 85）+ 单调 backpressure `effective_wrap_pct=base*(1+base/100)^inline_count`（封顶 100，跨 chunk 累计，附单元测试）
+- `publish.yml` 新增 `github-release` job（tag 推送 publish 成功后按 `CHANGELOG.md` 对应版本节建 Release，tag 含 `-` 则 `--prerelease`，已存在跳过）
 
 ### Changed
--
+- crypto 原语评分按 XOR=(1,1)/Ascon-128=(80,80) 双锚点重标定（S 封顶 25；PKCS7/标签归 S=1，静态 S-Box 降至 S=2）
+- 档位门同步新标尺：LOW `(30,0,×1)→(20,0,×1)`（重原语禁入，只剩轻原语 7 项），BALANCED `(100,50,×2)→(100,18,×2)`（约 2–5 层达标），HIGH `(100,95,×4)→(100,60,×4)`（约 4 层强原语达标）；三档新增 `wrap_pct` 见 Added
+- L 改按 `tests/perf_crypto.rs` 实测落地（16B 总耗时相对同 harness Ascon-128，封顶 100）：轻原语取 6–12（A 版系统性偏低约 2–3×，系 Ascon fixed 本底所致），`mse_no_ps` 取 65，`p_dyn` 取 39，`mse_no_s`/`mse`/`s_dyn`/`r8x3`/`p_multi`/`ps_multi` 六项饱和封顶 100；重档内部排序看 fixed 绝对值，单值 L 在此失真
+- 解密发射重构：`build_dec2` 改为 `build_dec_layers`，删除整 chunk 三选一 `__dec_fn` 包装（含 `first_iv` 死分支），改为逐层内联/`#[cold]#[inline(never)] __dec_layer_{tag}` 混排（等长/变长统一签名，附 `black_box(f) as usize` 防 ICF 合并）；纯栈阈值 `peak<=32→<=16`
+- 全部 `dec` 生成片段加 `black_box` 硬化（`key/iv` 先黑盒、每字节结果再黑盒，`mse*` 防跨 crate 内联再黑盒一次，PKCS7/标签对拷贝字节逐个黑盒；`latency` 数值维持原测定值不变）
+- README 中英性能节声明双数据源（`tests/perf.rs` 整串口径 + `tests/perf_crypto.rs` 原语 L 标定）
 
 ### Deprecated
 -
@@ -25,7 +32,8 @@
 -
 
 ### Fixed
--
+- 多轮 P 原语 enc 轮数计算避免跨平台 `usize` 位宽不可移植（`((key>>8) as usize %3)+3` 改为 `((key>>8)%3) as usize+3`，与 dec 侧对齐）
+- PKCS7/标签 `dec` 去掉 `__src_` 中转，截断拷贝后立即 `drop(in_ident)`（`out_size` 自报告长度校验不变）
 
 ### Security
 -
