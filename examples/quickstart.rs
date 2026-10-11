@@ -21,9 +21,8 @@ fn user_agent() -> impl AsRef<str> {
 
 /// API token（字节形态，防 UTF-8 扫描启发式）。
 fn api_token() -> Box<dyn Str> {
-    let keys: Vec<Box<dyn Str>> = vec![
-        Box::new(s2!("tok-7f3a9c1e")),
-        Box::new(s2!("tok-7f3a9c13"))];
+    let keys: Vec<Box<dyn Str>> =
+        vec![Box::new(s2!("tok-7f3a9c1e")), Box::new(s2!("tok-7f3a9c13"))];
     keys[1].clone()
 }
 
