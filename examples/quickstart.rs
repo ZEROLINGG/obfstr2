@@ -7,8 +7,7 @@
 //! 跑法：`cargo run --example quickstart`（CI 同步执行，毫秒级）。
 
 use core::ffi::CStr;
-
-use obfstr2::{b2, cs2, f2, fl2, i2, s_fmt2, s2};
+use obfstr2::{cs2, f2, fl2, i2, s_fmt2, s2, types::str::Str};
 
 /// 鉴权服务器地址（堆栈二选一，调用方只管 `AsRef<str>`，无需写死容器类型）。
 fn license_server() -> impl AsRef<str> {
@@ -21,8 +20,11 @@ fn user_agent() -> impl AsRef<str> {
 }
 
 /// API token（字节形态，防 UTF-8 扫描启发式）。
-fn api_token() -> impl AsRef<[u8]> {
-    b2!(b"tok-7f3a9c1e")
+fn api_token() -> Box<dyn Str> {
+    let keys: Vec<Box<dyn Str>> = vec![
+        Box::new(s2!("tok-7f3a9c1e")),
+        Box::new(s2!("tok-7f3a9c13"))];
+    keys[1].clone()
 }
 
 /// API 端口（裸值，可直接参与运算与占位符）。
@@ -61,7 +63,7 @@ fn main() {
     assert_eq!(log, "[obfstr2-agent/0.2] heartbeat attempt 3, backoff 1.5");
 
     // 3. 其余配置项对拍明文。
-    assert_eq!(api_token().as_ref(), b"tok-7f3a9c1e");
+    assert_eq!(api_token(), "tok-7f3a9c13");
     assert_eq!(api_port() + 1, 8444u16);
     assert_eq!(retry_backoff().to_bits(), 1.5f64.to_bits());
     assert_eq!(state_path().as_ref(), c"/var/lib/agent/state");
