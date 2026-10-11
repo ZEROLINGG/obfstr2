@@ -1,7 +1,7 @@
 # obfstr2
-<!-- i18n-sync-anchor:(sha256:d4d5651d1db439a21c0678b16b46a979959da2c391031a7505af05d666a9142f reviewed:false source:README.md) -->
+<!-- i18n-sync-anchor:(sha256:a3f6048b2c57868434c87ca28057225e6ecec07a92d62424f9a6fbdf5eb6e757 reviewed:false source:README.md) -->
 
-> **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation (`no_std` compatible)**
+> **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation **
 
 [![Type](https://img.shields.io/badge/Project%20Type-Library-green.svg)](#quick-start)
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
@@ -58,11 +58,11 @@ One-macro compile-time obfuscation: literals in, expressions out; obfuscation ha
 
 ```toml
 [dependencies]
-obfstr2 = "0.1"
+obfstr2 = "0.2"
 ```
 
 ```rust
-use obfstr2::{b2, cs2, f2, fl2, i2, s2, s_fmt};
+use obfstr2::{b2, cs2, f2, fl2, i2, s2, s_fmt2};
 
 fn main() {
     // Strings: evaluate to the original at runtime; owned containers that
@@ -91,7 +91,7 @@ fn main() {
     // Format strings: literal chunks are obfuscated one by one, then go
     // through `format!`; placeholders work as usual, returns `String`
     let name = "world";
-    let greeting = s_fmt!("hello, {}!", name);
+    let greeting = s_fmt2!("hello, {}!", name);
     print!("{greeting}");
 }
 ```
@@ -106,7 +106,8 @@ fn main() {
 | `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` float literals (empty suffix means `f64`)                                    | Low-latency / Balanced / High-strength                                              |
 | `cs1!` / `cs2!` / `cs3!` | `"..."` / `c"..."` / `b"..."` (`b"..."` may hold non-UTF-8 bytes; payload must not contain interior NUL) | Low-latency / Balanced / High-strength                                              |
 | `f1!` / `f2!` / `f3!`    | `"path/to/file"` file path literals                                                                      | Low-latency / Balanced / High-strength                                              |
-| `s_fmt!`                 | `"...{}..."` format string + args (tier 1)                                                               | Literal chunks obfuscated, then `format!`; returns `String` (needs `std` / `alloc`) |
+| `s_fmt1!` / `s_fmt2!` / `s_fmt3!` | `"...{}..."` format string + args | Literal chunks obfuscated per tier, then `format!`; returns `String` (needs `std`; tier `2` / `3` chunks may use `Heap*`, needs default features) |
+| `s_fmt!` (deprecated, alias of `s_fmt1!`) | Same as above | Behaves exactly like `s_fmt1!`; please migrate |
 
 Notes:
 
@@ -132,14 +133,19 @@ Notes:
 
 | Feature | Enabled by default | Description |
 | :--- | :--- | :--- |
-| `default` | ✅ | `lib-unknown/alloc` + `obfstr2-macros/alloc`, enables `Heap*` heap types |
-| `alloc` (per crate) | ❌ | With it off, only `Stack*` is available (pure stack, no heap, bare-metal `no_std` ready) |
+| `default` | ✅ | Enables heap support: turns on `alloc` in both downstream `lib-unknown` and `obfstr2-macros`, so expanded code may use `Heap*` heap types |
+
+Notes:
+
+- This crate has no features other than `default`; `alloc` is a switch owned by each of the two downstream crates (the root crate has no bare `alloc`, so `features = ["alloc"]` is invalid). `default` and `default-features = false` both keep the two sides in sync; if you need manual control, name both sides with slash syntax and never enable only the macro side — otherwise expansion emits `Heap*` paths that don't exist, failing the downstream build.
+- With features off, everything is pure stack: tier 1 (`s1` / `b1` / `i1` / `fl1` / `cs1` / `f1`) is always stack-only and unaffected; if a chunk's peak intermediate buffer exceeds 1024B with no heap available, expansion fails with a compile-time error (keep default features for high-strength tiers + long payloads).
+- `s_fmt1!` / `s_fmt2!` / `s_fmt3!` expand to `::std::format!` and return `String`, so downstream code needs `std` regardless of the stack-only combination; legacy `s_fmt!` is an alias of `s_fmt1!` and deprecated.
 
 To disable default features (pure stack, no heap):
 
 ```toml
 [dependencies]
-obfstr2 = { version = "0.1", default-features = false }
+obfstr2 = { version = "0.2", default-features = false }
 ```
 
 ## Platform Support
@@ -170,11 +176,11 @@ Per-primitive L scores are grounded in `tests/perf_crypto.rs` (re-runnable via `
 
 | Program | Per-decryption cost | Run time (100 decryption rounds, incl. startup) | Incremental build | Cold build | Binary (unstripped) | Expanded chars |
 |:---|:---|:---|:---|:---|:---|:---|
-| Plaintext baseline (`static` reference) | — | 10.28ms | 181.94ms | 507.73ms | 444960 | 1437 |
-| CasualX/obfstr 0.4 | 0.34µs | 10.32ms (0%) | 202.03ms (11%) | 1.22s (140%) | 447984 (1%) | 7780 (441%) |
-| obfstr2 (`b1!`) | 0.15µs | 10.30ms (0%) | 616.18ms (239%) | 3.76s (641%) | 493960 (11%) | 66690 (4541%) |
-| obfstr2 (`b2!`) | 101.11µs | 20.39ms (98%) | 779.72ms (329%) | 4.02s (692%) | 529488 (19%) | 109879 (7546%) |
-| obfstr2 (`b3!`) | 304.51µs | 40.73ms (296%) | 1.18s (550%) | 4.27s (741%) | 559696 (26%) | 154914 (10680%) |
+| Plaintext baseline (`static` reference) | — | 10.29ms | 161.96ms | 443.46ms | 444960 | 1437 |
+| CasualX/obfstr 0.4 | 0.02µs | 10.29ms (0%) | 201.72ms (25%) | 1.50s (237%) | 447992 (1%) | 7780 (441%) |
+| obfstr2 (`b1!`) | 0.49µs | 10.34ms (0%) | 648.55ms (300%) | 4.33s (877%) | 489984 (10%) | 68916 (4696%) |
+| obfstr2 (`b2!`) | 0.43µs | 10.33ms (0%) | 1.96s (1112%) | 5.90s (1231%) | 655608 (47%) | 456148 (31643%) |
+| obfstr2 (`b3!`) | 809.02µs | 91.19ms (786%) | 2.41s (1389%) | 7.77s (1652%) | 712456 (60%) | 525779 (36489%) |
 
 Parameter notes:
 
@@ -200,6 +206,7 @@ Issues and Pull Requests are welcome!
 
 - Local verification:
   - `cargo test --test smoke --test s_fmt`: correctness of all macros, in-process assertions, milliseconds;
+  - `cargo run --example quickstart`: desktop-agent mini story (auth → report → log), assertions against plaintext;
   - `cargo test --test compile_fail`: compile-time rejection of invalid inputs (isolated dyntest projects per case);
   - `cargo test --test nostd`: `x86_64-unknown-none` bare-metal link (`b1` pure-stack without allocator + `b2` with heap; install that target first);
   - `cargo test --test perf -- --ignored --nocapture`: benchmark report (plaintext baseline vs CasualX vs `b1/b2/b3`; build/run time, expanded chars, binary size; report-only, needs network for `obfstr` plus `cargo-expand`);

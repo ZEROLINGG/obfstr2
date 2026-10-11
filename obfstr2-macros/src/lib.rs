@@ -199,6 +199,7 @@ pub fn f3(input: TokenStream) -> TokenStream {
 
 /// 格式化字符串混淆宏本体（1 档）：首参须为字符串字面量，其中的字面量片段逐个混淆后注入 `format!` 调用，
 /// 占位符与后续参数原样保留。返回 `String`，需要调用方有 `std` / `alloc`。
+/// 与 `s_fmt1` 等价；根 crate 侧已废弃，请迁移至 `s_fmt1`。
 ///
 /// # Warning
 ///
@@ -206,7 +207,40 @@ pub fn f3(input: TokenStream) -> TokenStream {
 /// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/s_fmt.rs`。
 #[proc_macro]
 pub fn s_fmt(input: TokenStream) -> TokenStream {
-    combine::sfmt(input.into()).into()
+    combine::sfmt(input.into(), types::s1).into()
+}
+
+/// 格式化字符串混淆宏本体（低延迟档）：输入与展开规则同 `s_fmt`，字面量片段走 `s1` 档混淆。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/s_fmt.rs`。
+#[proc_macro]
+pub fn s_fmt1(input: TokenStream) -> TokenStream {
+    combine::sfmt(input.into(), types::s1).into()
+}
+
+/// 格式化字符串混淆宏本体（均衡档）：输入与展开规则同 `s_fmt`，字面量片段走 `s2` 档混淆。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/s_fmt.rs`。
+#[proc_macro]
+pub fn s_fmt2(input: TokenStream) -> TokenStream {
+    combine::sfmt(input.into(), types::s2).into()
+}
+
+/// 格式化字符串混淆宏本体（高强度档）：输入与展开规则同 `s_fmt`，字面量片段走 `s3` 档混淆。
+///
+/// # Warning
+///
+/// 内部实现，外部请使用 `obfstr2` 根 crate 的同名宏；宏本体与展开形态可随版本变更，不做稳定性承诺。
+/// 用户文档与可运行示例见 `obfstr2` 根 crate，覆盖见根 crate `tests/s_fmt.rs`。
+#[proc_macro]
+pub fn s_fmt3(input: TokenStream) -> TokenStream {
+    combine::sfmt(input.into(), types::s3).into()
 }
 
 /// 整数混淆宏本体（低延迟档）：只接受整数字面量（如 `42u8`、`-1`、`0xFFu16`，空后缀视为 `i32`），

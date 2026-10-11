@@ -131,8 +131,13 @@ fn parse_placeholder(
     Ok(ph)
 }
 
-/// 用 s1 档混淆格式串中的字面量部分，展开为 `::std::format!` 调用（返回 `String`）。
-pub fn sfmt(input: TokenStream2) -> TokenStream2 {
+/// 按档位混淆格式串中的字面量部分，展开为 `::std::format!` 调用（返回 `String`）。
+///
+/// `build` 为字面量片段的档位入口（`s1` / `s2` / `s3`）；调用方（`s_fmt1/2/3` 本体）传入对应档位。
+pub fn sfmt(
+    input: TokenStream2,
+    build: fn(String) -> Result<TokenStream2, String>,
+) -> TokenStream2 {
     let args = match syn::parse2::<FormatArgs>(input) {
         Ok(args) => args,
         Err(err) => return err.to_compile_error(),
@@ -162,7 +167,7 @@ pub fn sfmt(input: TokenStream2) -> TokenStream2 {
 
                 new_fmt.push_str(&format!("{{{arg_name}}}"));
 
-                let ts = match crate::types::s1(unescaped_text) {
+                let ts = match build(unescaped_text) {
                     Ok(ts) => ts,
                     Err(e) => {
                         return syn::Error::new(args.fmt_lit.span(), e).to_compile_error();

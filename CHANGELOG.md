@@ -13,9 +13,34 @@
 ## [Unreleased]
 
 ### Added
-- `tests/perf_crypto.rs` 原语级 L 标定测试（报告-only，默认忽略）：17 行 `dec` 等价体 × 5 长度扫描，拟合 `ns=fixed+k·len`，以同 harness Ascon-128 斜率为 L=80 锚点换算；根 `Cargo.toml` 新增 `ascon-aead` dev 依赖仅供该测试用
+-
+
+### Changed
+-
+
+### Deprecated
+-
+
+### Removed
+-
+
+### Fixed
+-
+
+### Security
+-
+
+---
+
+## [0.2.0] - 2026-10-11
+
+### Added
+- `tests/perf_crypto.rs` 原语级 L 标定测试（报告-only，默认忽略）：17 行 `dec` 等价体 × 5 长度扫描，拟合 `ns=fixed+k·len`，以同 harness Ascon-128 斜率为 L=80 锚点换算；`ascon-aead` 仅由 guest 临时工程自给，根 `Cargo.toml` 不新增 dev 依赖
 - 解密逐层包装概率 `TierParams::wrap_pct`（LOW 15 / BALANCED 50 / HIGH 85）+ 单调 backpressure `effective_wrap_pct=base*(1+base/100)^inline_count`（封顶 100，跨 chunk 累计，附单元测试）
 - `publish.yml` 新增 `github-release` job（tag 推送 publish 成功后按 `CHANGELOG.md` 对应版本节建 Release，tag 含 `-` 则 `--prerelease`，已存在跳过）
+- 垃圾块混淆重落地：`TierParams::junk_pct` 去掉 `#[allow(dead_code)]` 正式生效（LOW 5 / BALANCED 20 / HIGH 40，按 chunk 掷骰，>100 视为恒插）：假数据取真 chunk 明文长的 1/10~全长，与主路径同构（`encrypt_layers`→存储→`build_dec_layers`），解出结果 `black_box` + `drop` 只进黑洞、不并入主容器；4 种不透明谓词包装（恒真取模分支/单次 `while`/双臂同体 `ghost` 分支/裸块）；存储空池、超纯栈预算无堆、`encrypt` 失败均静默跳过本轮不牵连真 chunk；`ident` 独立 `f` 后缀、`fake_inline` 局部计数不污染真路径 backpressure，`ghost_state` 只读作分支条件、不写入
+- 格式化字符串宏分三档：新增 `s_fmt1!` / `s_fmt2!` / `s_fmt3!`（字面量片段分别走 `s1` / `s2` / `s3` 档混淆，`combine::sfmt` 按档位入口参数化；`2` / `3` 档片段可能走 `Heap*`，无堆时回退纯栈）；`tests/s_fmt.rs` 原 8 用例转 `s_fmt1!`，新增三档对拍 + 别名等价用例
+- `examples/quickstart.rs` 可运行实战示例（桌面 Agent 鉴权→上报→日志，七类宏各一次，断言对拍明文；`cargo run --example quickstart`，CI 同步执行）
 
 ### Changed
 - crypto 原语评分按 XOR=(1,1)/Ascon-128=(80,80) 双锚点重标定（S 封顶 25；PKCS7/标签归 S=1，静态 S-Box 降至 S=2）
@@ -24,9 +49,13 @@
 - 解密发射重构：`build_dec2` 改为 `build_dec_layers`，删除整 chunk 三选一 `__dec_fn` 包装（含 `first_iv` 死分支），改为逐层内联/`#[cold]#[inline(never)] __dec_layer_{tag}` 混排（等长/变长统一签名，附 `black_box(f) as usize` 防 ICF 合并）；纯栈阈值 `peak<=32→<=16`
 - 全部 `dec` 生成片段加 `black_box` 硬化（`key/iv` 先黑盒、每字节结果再黑盒，`mse*` 防跨 crate 内联再黑盒一次，PKCS7/标签对拷贝字节逐个黑盒；`latency` 数值维持原测定值不变）
 - README 中英性能节声明双数据源（`tests/perf.rs` 整串口径 + `tests/perf_crypto.rs` 原语 L 标定）
+- 加密选层收敛为 `core.rs::encrypt_layers`（真 chunk 与垃圾块共用同一入口，过滤口径一致；`chunk_tag` 参数化错误定位，行为不变）
+- 均衡档加严 `TIER_BALANCED (100,18,×2)→(80,28,×2)`（`latency: 100` 六项重原语禁入均衡档，组合安全度下限 18→28；`b2` 层数/体积/耗时向高强度靠拢）
+- 内部重命名（零行为变更）：`PRIMITIVES→CRYPTOS`、`STORAGE_STRATEGIES→STORAGES`；`crypto.rs` 补文件末换行
+- README 中英性能表示例同步本次 1024B release 实测（基线冷构建 443ms；`b2` expand 456k/31643%、冷构建 5.90s/1231%，`b3` 每次去混淆 809µs、运行 91ms/786%；多态 + 机器抖动，量级参考）
 
 ### Deprecated
--
+- `s_fmt!` 已废弃（与 `s_fmt1!` 等价的别名，`#[deprecated(since = "0.2.0")]`，行为不变；根 crate 快速开始与宏一览已切 `s_fmt2!` / 三档行），请迁移至 `s_fmt1!`，将于未来大版本移除
 
 ### Removed
 -
@@ -200,7 +229,8 @@
 
 ---
 
-[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.11-preview...HEAD
+[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.11-preview...v0.2.0
 [0.1.11-preview]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.10...v0.1.11-preview
 [0.1.10]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.8...v0.1.9

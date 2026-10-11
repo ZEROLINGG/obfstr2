@@ -57,11 +57,11 @@
 
 ```toml
 [dependencies]
-obfstr2 = "0.1"
+obfstr2 = "0.2"
 ```
 
 ```rust
-use obfstr2::{b2, cs2, f2, fl2, i2, s2, s_fmt};
+use obfstr2::{b2, cs2, f2, fl2, i2, s2, s_fmt2};
 
 fn main() {
     // 字符串：求值即得原文，返回自有容器，可绑定、传递、复用
@@ -84,7 +84,7 @@ fn main() {
     let d = f2!("assets/fixture.bin");
     // 格式化字符串：字面量片段逐个混淆后走 `format!`，占位符照常使用，返回 `String`
     let name = "world";
-    let greeting = s_fmt!("hello, {}!", name);
+    let greeting = s_fmt2!("hello, {}!", name);
     print!("{greeting}");
 }
 ```
@@ -99,7 +99,8 @@ fn main() {
 | `fl1!` / `fl2!` / `fl3!` | `3.15f32` / `-1.0` / `1e10` 等浮点字面量（空后缀视为 `f64`） | 低延迟 / 均衡 / 高强度 |
 | `cs1!` / `cs2!` / `cs3!` | `"..."` / `c"..."` / `b"..."`（`b"..."` 可含非 UTF-8 字节，载荷禁内部 NUL） | 低延迟 / 均衡 / 高强度 |
 | `f1!` / `f2!` / `f3!` | `"path/to/file"` 文件路径字面量 | 低延迟 / 均衡 / 高强度 |
-| `s_fmt!` | `"...{}..."` 格式串 + 参数（1 档） | 字面量片段混淆后走 `format!`，返回 `String`（需 `std` / `alloc`） |
+| `s_fmt1!` / `s_fmt2!` / `s_fmt3!` | `"...{}..."` 格式串 + 参数 | 字面量片段按档位混淆后走 `format!`，返回 `String`（需 `std`；`2` / `3` 档的字面量片段可能走 `Heap*`，需默认特性） |
+| `s_fmt!`（已废弃，为 `s_fmt1!` 别名） | 同上 | 行为与 `s_fmt1!` 等价，请迁移 |
 
 说明：
 
@@ -125,14 +126,19 @@ fn main() {
 
 | Feature | 默认启用 | 说明 |
 | :--- | :--- | :--- |
-| `default` | ✅ | `lib-unknown/alloc` + `obfstr2-macros/alloc`，开启 `Heap*` 堆内存类型 |
-| `alloc`（各 crate 独立） | ❌ | 关闭时仅 `Stack*` 可用（纯栈、无堆，`no_std` 裸机可用） |
+| `default` | ✅ | 开启堆内存支持：同时启用下游 `lib-unknown` 与 `obfstr2-macros` 的 `alloc`，展开代码可用 `Heap*` 堆内存类型 |
+
+注意：
+
+- 本 crate 除 `default` 外无其他特性；`alloc` 是下游两 crate 各自的开关（根 crate 无裸 `alloc`，`features = ["alloc"]` 无效）。`default` 与 `default-features = false` 都是两侧同开同关；如需手动控制请用斜杠语法同时指定两侧，不要单独只开宏侧——否则会展开出不存在的 `Heap*` 路径，导致下游编译失败。
+- 关闭后为纯栈：1 档（`s1` / `b1` / `i1` / `fl1` / `cs1` / `f1`）恒纯栈、无影响；chunk 中间容器峰值超 1024B 且无堆可用时为编译期报错（高强度档 + 长载荷请保留默认特性）。
+- `s_fmt1!` / `s_fmt2!` / `s_fmt3!` 展开为 `::std::format!` 并返回 `String`，下游需 `std`，与纯栈组合无关；旧 `s_fmt!` 为 `s_fmt1!` 别名，已废弃。
 
 如需禁用默认特性（纯栈、无堆）：
 
 ```toml
 [dependencies]
-obfstr2 = { version = "0.1", default-features = false }
+obfstr2 = { version = "0.2", default-features = false }
 ```
 
 ## 平台与环境支持
@@ -163,11 +169,11 @@ MSRV 为 `1.98`，已在双 `Cargo.toml` 的 `rust-version` 声明。
 
 | 用例                  | 每次去混淆耗时 | 运行耗时（100 次解密循环，含启动开销） | 增量构建耗时         | 冷构建耗时          | 产物二进制（未 strip） | expand 字符数     |
 |:--------------------|:--------|:---------------------|:----------------|:---------------|:---------------|:----------------|
-| 明文基线（`static` 直接引用） | —       | 10.28ms              | 181.94ms        | 507.73ms       | 444960         | 1437            |
-| CasualX/obfstr 0.4  | 0.34µs  | 10.32ms（0%）          | 202.03ms（11%）   | 1.22s（140%）    | 447984（1%）     | 7780（441%）      |
-| obfstr2（`b1!`）      | 0.15µs  | 10.30ms（0%）          | 616.18ms（239%）  | 3.76s（641%）    | 493960（11%）    | 66690（4541%）    |
-| obfstr2（`b2!`）      | 101.11µs | 20.39ms（98%）        | 779.72ms（329%）  | 4.02s（692%）    | 529488（19%）    | 109879（7546%）   |
-| obfstr2（`b3!`）      | 304.51µs | 40.73ms（296%）       | 1.18s（550%）     | 4.27s（741%）    | 559696（26%）    | 154914（10680%）  |
+| 明文基线（`static` 直接引用） | —       | 10.29ms              | 161.96ms        | 443.46ms       | 444960         | 1437            |
+| CasualX/obfstr 0.4  | 0.02µs  | 10.29ms（0%）          | 201.72ms（25%）   | 1.50s（237%）    | 447992（1%）     | 7780（441%）      |
+| obfstr2（`b1!`）      | 0.49µs  | 10.34ms（0%）          | 648.55ms（300%）  | 4.33s（877%）    | 489984（10%）    | 68916（4696%）    |
+| obfstr2（`b2!`）      | 0.43µs  | 10.33ms（0%）          | 1.96s（1112%）    | 5.90s（1231%）   | 655608（47%）    | 456148（31643%）  |
+| obfstr2（`b3!`）      | 809.02µs | 91.19ms（786%）       | 2.41s（1389%）    | 7.77s（1652%）   | 712456（60%）    | 525779（36489%）  |
 
 参数说明：
 
@@ -192,6 +198,7 @@ MSRV 为 `1.98`，已在双 `Cargo.toml` 的 `rust-version` 声明。
 
 - 本地验证：
   - `cargo test --test smoke --test s_fmt`：全部宏正确性，进程内断言，毫秒级；
+  - `cargo run --example quickstart`：桌面 Agent 实战小故事（鉴权→上报→日志），断言对拍明文；
   - `cargo test --test compile_fail`：非法输入的编译期拒绝（各用例隔离的 dyntest 工程）；
   - `cargo test --test nostd`：`x86_64-unknown-none` 裸机链路（`b1` 纯栈无分配 + `b2` 含堆，需安装该 target）；
   - `cargo test --test perf -- --ignored --nocapture`：性能对比报告（明文基线 vs CasualX vs `b1/b2/b3`，编译耗时 / 运行耗时 / expand 字符数 / 产物体积，只展示不断言，需联网拉取 `obfstr` 并安装 `cargo-expand`）；

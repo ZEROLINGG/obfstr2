@@ -190,10 +190,74 @@ macro_rules! f3 {
     };
 }
 
-/// 格式化字符串混淆宏（1 档）。
+/// 格式化字符串混淆宏（低延迟档）。
 ///
 /// 首参须为字符串字面量：其中的字面量片段逐个混淆后注入 `format!` 调用，
 /// 占位符与后续参数原样保留。返回 `String`，需要调用方有 `std` / `alloc`。
+///
+/// # Examples
+///
+/// ```rust
+/// use obfstr2::s_fmt1;
+///
+/// let name = "world";
+/// let s = s_fmt1!("hello, {}!", name);
+/// assert_eq!(s, "hello, world!");
+/// let t = s_fmt1!("hi, {name}!", name = name);
+/// assert_eq!(t, "hi, world!");
+/// ```
+#[macro_export]
+macro_rules! s_fmt1 {
+    ($($tt:tt)*) => {
+        ::obfstr2::obfstr2_macros::s_fmt1!($($tt)*)
+    };
+}
+
+/// 格式化字符串混淆宏（均衡档）。
+///
+/// 输入与展开规则同 [`s_fmt1!`](crate::s_fmt1)，字面量片段走 `s2` 档混淆。
+///
+/// # Examples
+///
+/// ```rust
+/// use obfstr2::s_fmt2;
+///
+/// let name = "world";
+/// let s = s_fmt2!("hello, {}!", name);
+/// assert_eq!(s, "hello, world!");
+/// ```
+#[macro_export]
+macro_rules! s_fmt2 {
+    ($($tt:tt)*) => {
+        ::obfstr2::obfstr2_macros::s_fmt2!($($tt)*)
+    };
+}
+
+/// 格式化字符串混淆宏（高强度档）。
+///
+/// 输入与展开规则同 [`s_fmt1!`](crate::s_fmt1)，字面量片段走 `s3` 档混淆。
+///
+/// # Examples
+///
+/// ```rust
+/// use obfstr2::s_fmt3;
+///
+/// let name = "world";
+/// let s = s_fmt3!("hello, {}!", name);
+/// assert_eq!(s, "hello, world!");
+/// ```
+#[macro_export]
+macro_rules! s_fmt3 {
+    ($($tt:tt)*) => {
+        ::obfstr2::obfstr2_macros::s_fmt3!($($tt)*)
+    };
+}
+
+/// 格式化字符串混淆宏（1 档，别名）。
+///
+/// 与 [`s_fmt1!`](crate::s_fmt1) 等价，已废弃，请迁移至 `s_fmt1!`。
+/// 首参须为字符串字面量：其中的字面量片段逐个混淆后注入 `format!` 调用，
+/// 占位符与后续参数原样保留。返回 `String`，需要调用方有 `std` / `alloc`.
 ///
 /// # Examples
 ///
@@ -206,6 +270,7 @@ macro_rules! f3 {
 /// let t = s_fmt!("hi, {name}!", name = name);
 /// assert_eq!(t, "hi, world!");
 /// ```
+#[deprecated(since = "0.2.0", note = "请改用 `s_fmt1!`，行为等价")]
 #[macro_export]
 macro_rules! s_fmt {
     ($($tt:tt)*) => {

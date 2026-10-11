@@ -1,4 +1,4 @@
-//! 多态密文存储策略注册表（`Storage` + `STORAGE_STRATEGIES`）。
+//! 多态密文存储策略注册表（`Storage` + `STORAGES`）。
 //!
 
 use lib_unknown::rand::random;
@@ -91,7 +91,7 @@ macro_rules! int_array_storage {
     };
 }
 
-pub(crate) static STORAGE_STRATEGIES: LazyLock<Vec<Storage>> = LazyLock::new(|| {
+pub(crate) static STORAGES: LazyLock<Vec<Storage>> = LazyLock::new(|| {
     vec![
         Storage {
             ast: |ident, type_path, _size, data| {

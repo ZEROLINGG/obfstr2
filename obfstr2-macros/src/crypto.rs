@@ -46,7 +46,7 @@ pub(crate) struct Crypto {
     pub(crate) latency: u8,
 }
 
-pub(crate) static PRIMITIVES: LazyLock<Vec<Crypto>> = LazyLock::new(|| {
+pub(crate) static CRYPTOS: LazyLock<Vec<Crypto>> = LazyLock::new(|| {
     vec![
         // CBC 模式异或链
         Crypto {

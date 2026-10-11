@@ -48,6 +48,10 @@ jobs:
           cargo test --all-features --all-targets
           cd obfstr2-macros && cargo test --all-features --all-targets
 
+      - name: run examples
+        run: |
+          cargo run --all-features --example quickstart
+
       - name: doctest (obfstr2-macros)
         run: |
           cd obfstr2-macros && cargo test --doc --all-features
