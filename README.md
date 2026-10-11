@@ -5,6 +5,7 @@
 [![Type](https://img.shields.io/badge/Project%20Type-Library-green.svg)](#快速开始-quick-start)
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
+[![Release](https://img.shields.io/github/v/release/ZEROLINGG/obfstr2)](https://github.com/ZEROLINGG/obfstr2/releases)
 [![Documentation](https://docs.rs/obfstr2/badge.svg)](https://docs.rs/obfstr2)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#开源协议-license)
 
@@ -88,6 +89,8 @@ fn main() {
     print!("{greeting}");
 }
 ```
+
+更多场景见 [`examples/quickstart.rs`](examples/quickstart.rs)（桌面 Agent 实战：`cargo run --example quickstart`）。
 
 ## 宏一览
 

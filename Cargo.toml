@@ -1,19 +1,20 @@
 [package]
 name = "obfstr2"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"
 description = "Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation"
 license = "MIT"
 readme = "README.md"
+documentation = "https://docs.rs/obfstr2"
 repository = "https://github.com/ZEROLINGG/obfstr2"
 keywords = ["obfuscation", "string", "no-std", "compile-time", "polymorphic"]
 categories = ["no-std", "embedded"]
 
 
 [dependencies]
-obfstr2-macros = { version = "=0.2.0", path = "obfstr2-macros" }
+obfstr2-macros = { version = "=0.2.1", path = "obfstr2-macros" }
 lib-unknown = { version = "0.1.6", default-features = false, features = ["crypto", "types"] }
 
 

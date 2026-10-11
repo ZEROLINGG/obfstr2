@@ -1,11 +1,12 @@
 # obfstr2
-<!-- i18n-sync-anchor:(sha256:a3f6048b2c57868434c87ca28057225e6ecec07a92d62424f9a6fbdf5eb6e757 reviewed:false source:README.md) -->
+<!-- i18n-sync-anchor:(sha256:16350b451f49493b1bf23465645fe784dd3ab6b130bf1e2421ba9ebdacc7db5d reviewed:false source:README.md) -->
 
 > **Polymorphic compile-time string/bytes/int/float/cstr/file obfuscation **
 
 [![Type](https://img.shields.io/badge/Project%20Type-Library-green.svg)](#quick-start)
 [![Crates.io](https://img.shields.io/crates/v/obfstr2.svg)](https://crates.io/crates/obfstr2)
 [![Downloads](https://img.shields.io/crates/d/obfstr2.svg)](https://crates.io/crates/obfstr2)
+[![Release](https://img.shields.io/github/v/release/ZEROLINGG/obfstr2)](https://github.com/ZEROLINGG/obfstr2/releases)
 [![Documentation](https://docs.rs/obfstr2/badge.svg)](https://docs.rs/obfstr2)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 
@@ -95,6 +96,8 @@ fn main() {
     print!("{greeting}");
 }
 ```
+
+More scenarios: [`examples/quickstart.rs`](examples/quickstart.rs) (desktop-agent mini story: `cargo run --example quickstart`).
 
 ## Macro Overview
 

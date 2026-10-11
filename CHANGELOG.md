@@ -32,6 +32,17 @@
 
 ---
 
+## [0.2.1] - 2026-10-11
+
+### Changed
+- 双 `Cargo.toml` 补 `documentation`（分别指向 `docs.rs/obfstr2` 与 `docs.rs/obfstr2-macros`）
+- README 中英补 GitHub Releases 徽章（读最新 tag，后续版本免维护）与快速开始末 `examples/quickstart.rs` 指引行
+
+### Fixed
+- CI（stable 工具链）`cargo fmt --check` 失败：新版 rustfmt 切 ASCII 排序后 `core.rs` 的 `{Crypto, LayerCtx, CRYPTOS}` 单行导入必红，拆为两行 `use`，新旧两版 rustfmt 均通过，零语义变更
+
+---
+
 ## [0.2.0] - 2026-10-11
 
 ### Added
@@ -229,7 +240,8 @@
 
 ---
 
-[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ZEROLINGG/obfstr2/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ZEROLINGG/obfstr2/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.11-preview...v0.2.0
 [0.1.11-preview]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.10...v0.1.11-preview
 [0.1.10]: https://github.com/ZEROLINGG/obfstr2/compare/v0.1.9...v0.1.10

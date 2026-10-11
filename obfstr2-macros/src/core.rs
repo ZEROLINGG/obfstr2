@@ -3,7 +3,8 @@
 //! 新内核：`LayerCtx` 自报告长度；`dec` 为 SSA 式
 //! `(AST, Ident_out)`，框架只做 fold 串联；失败显式 `Result` 上抛。
 
-use crate::crypto::{Crypto, LayerCtx, CRYPTOS};
+use crate::crypto::CRYPTOS;
+use crate::crypto::{Crypto, LayerCtx};
 use crate::storage::{STORAGES, Storage};
 use lib_unknown::rand::{random, random_range, shuffle};
 use proc_macro2::{Ident as Ident2, TokenStream as TokenStream2};

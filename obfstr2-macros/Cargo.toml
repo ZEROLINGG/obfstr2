@@ -1,12 +1,13 @@
 [package]
 name = "obfstr2-macros"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 resolver = "2"
 rust-version = "1.98"
 description = "Proc-macros for obfstr2 compile-time obfuscation (internal-only, no runtime; use `obfstr2` directly)"
 license = "MIT"
 readme = "README.md"
+documentation = "https://docs.rs/obfstr2-macros"
 repository = "https://github.com/ZEROLINGG/obfstr2"
 keywords = ["obfuscation", "proc-macro", "string", "no-std", "compile-time"]
 categories = ["no-std", "development-tools"]
